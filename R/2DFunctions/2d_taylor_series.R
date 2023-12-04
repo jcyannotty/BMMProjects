@@ -16,6 +16,9 @@ library(viridis)
 library(latex2exp)
 library(geoR)
 
+# Out file directory
+filedir = '/home/johnyannotty/Documents/RandomPathBART/VariogramResults/2d_functions/'
+
 #-----------------------------------------------------
 #-----------------------------------------------------
 set.seed(2)
@@ -126,7 +129,6 @@ for(j in 1:K){
 
 
 # Save results
-filedir = '/home/johnyannotty/Documents/Dissertation/results/2d_functions/'
 fit_data = list(
   pred_mean = fitp$mmean,
   pred_ub = fitp$m.upper,
@@ -156,7 +158,118 @@ saveRDS(fit_data, paste0(filedir,"taylor_sincos2_results3_10_30_23.rds"))
 
 
 #-----------------------------------------------------
-# Variogram
+# Precision Weights Empirical Variogram
+#-----------------------------------------------------
+# Precision Weight calculation
+pw_se = apply(f_train,2,function(x) (y_train-x)^2)
+pw_denom = rowSums(1/pw_se)
+pw = (1/pw_se)/pw_denom
+rowSums(pw)
+
+# Get nearest neightbors
+knn = 3
+d = outer(x_train[,1],x_train[,1], "-")^2 + outer(x_train[,2],x_train[,2], "-")^2
+nn = t(matrix(apply(d,1,function(x) order(x)[2:(knn+1)]),nrow = knn))
+pw_nn = 0*pw
+
+for(i in 1:n_train){
+  ind = c(i,nn[i,])
+  pw_se_nn = apply(pw_se[ind,],2,sum)
+  pw_nn[i,] = (1/pw_se_nn)/sum(1/pw_se_nn)
+}
+
+rowSums(pw_nn)
+plot(pw[,2])
+plot(pw_nn[,1])
+
+#xdata = cbind(x1 = x_train[,1],x2 = rep(0,n_train))
+xdata = cbind(x1 = x_train[,1],x2 = x_train[,2])
+vghat = c() 
+vghat_nn = c()
+ugrid = seq(0.3,7.5,by = 0.3)
+K = ncol(f_train)
+for(j in 1:K){
+  geor_vghat = variog(coords = xdata, data = pw[,j])#,uvec = ugrid)
+  vgh = 2*geor_vghat$v
+  vghat = cbind(vghat,vgh)
+  
+  geor_vghat = variog(coords = xdata, data = pw_nn[,j])#,uvec = ugrid)
+  vgh = 2*geor_vghat$v
+  vghat_nn = cbind(vghat_nn,vgh)
+}
+
+colnames(vghat) = paste0("vw",1:K)
+colnames(vghat_nn) = paste0("vw",1:K)
+
+
+# Plot the empirical variogram for the mean weight
+vghat_mean = rowMeans(vghat)
+plot(geor_vghat$u,vghat_mean)
+
+plot(geor_vghat$u,vghat[,1])
+abline(h = 2*var(pw_nn[,1]))
+
+# Save results
+out = list(vghat = vghat,vghat_nn = vghat_nn,hgrid = geor_vghat$u, 
+           what = pw, what_nn = pw_nn, x = x_train,y = y_train)
+saveRDS(out, paste0(filedir,"taylor_sincos2_emp_variogram_precwts_11_15_23.rds"))
+
+
+#-----------------------------------------------------
+# Theoretical Variogram
+#-----------------------------------------------------
+xbnds = matrix(c(xmin,xmax),nrow = 2,ncol = 2, byrow = TRUE)
+h_grid = seq(0.1,6.5,by = 0.1)
+vg = variogram.openbtmixing(xbnds,h_grid,10000,1,
+                            k=0.8,
+                            0.95,
+                            power = 2,
+                            a1 = 10,
+                            a2 = 10,
+                            4)
+
+plot(h_grid,vg$vmean, type = "l", ylim = c(0,0.8))
+points(geor_vghat$u,vghat_mean)
+
+# Theoretical grid search
+grid = expand.grid(a1=c(5,10),a2=c(10,15,20),beta=c(2),k=c(0.6,0.7,0.8,1))
+h_grid = seq(0.1,7.5,by = 0.1)
+xbnds = matrix(c(xmin,xmax),nrow = 2,ncol = 2, byrow = TRUE)
+vg_mat = matrix(0,nrow = nrow(grid), ncol = length(h_grid))
+for(i in 1:nrow(grid)){
+  vg = variogram.openbtmixing(xbnds, h_grid,10000,1,
+                              k=grid[i,"k"],
+                              0.95,
+                              power = grid[i,"beta"],
+                              a1 = grid[i,"a1"],
+                              a2 = grid[i,"a2"],
+                              4)
+  vg_mat[i,] = vg$vmean
+  cat("Progress: i = ", round(i/nrow(grid),4),"\r")
+}
+
+# Plot variogram
+plot(h_grid,vg_mat[19,], type = "l", ylim = c(0,0.3))
+lines(h_grid,vg_mat[20,], col = 'red')
+lines(h_grid,vg_mat[21,], col = 'blue')
+points(geor_vghat$u,vghat_mean)
+
+plot(h_grid,vg_mat[1,], type = "l", ylim = c(0,0.3))
+lines(h_grid,vg_mat[2,], col = 'red')
+lines(h_grid,vg_mat[3,], col = 'blue')
+points(geor_vghat$u,vghat_mean)
+
+# Get the best fitting variogram
+which.min(apply(vg_mat,1,function(x) sqrt(mean((x-vghat_mean)^2))))
+order(apply(vg_mat,1,function(x) sqrt(mean((x-vghat_mean)^2))))
+
+# Save results
+out = list(vg = vg_mat,x = x_train,y = y_train,h = h_grid, pgrid = grid)
+saveRDS(out, paste0(filedir,"taylor_sincos2_thr_variogram_wt_11_15_23.rds"))
+
+
+#-----------------------------------------------------
+# Original Pointwise variogram idea
 #-----------------------------------------------------
 tau2 = (1/(2*1))^2
 h_grid = seq(0.1,6,by = 0.1)
@@ -191,64 +304,6 @@ plot(geor_vghat$u,vghat_mean)
 filedir = '/home/johnyannotty/Documents/Dissertation/results/2d_functions/'
 out = list(vghat = vghat, hgrid = geor_vghat$u, what = wt_ptw, x = x_train,y = y_train, h = h_grid)
 saveRDS(out, paste0(filedir,"taylor_sincos2_emp_variogram_wt_10_30_23.rds"))
-
-
-# Theoretical 
-xbnds = matrix(c(xmin,xmax),nrow = 2,ncol = 2, byrow = TRUE)
-vg = variogram.openbtmixing(xbnds,h_grid,10000,1,
-                            k=1.25,
-                            0.95,
-                            power = 3,
-                            a1 = 2,
-                            a2 = 10,
-                            4)
-
-plot(h_grid,vg$vmean, type = "l", ylim = c(0,0.3))
-points(geor_vghat$u,vghat_mean)
-
-# Theoretical grid search
-grid = expand.grid(a1=c(2,5,10),a2=c(5,10,15),beta=c(2,2.5),k=c(1,1.25,1.5,2))
-h_grid = seq(0.1,6,by = 0.1)
-xbnds = matrix(c(xmin,xmax),nrow = 2,ncol = 2, byrow = TRUE)
-vg_mat = matrix(0,nrow = nrow(grid), ncol = length(h_grid))
-for(i in 1:nrow(grid)){
-  vg = variogram.openbtmixing(xbnds, h_grid,10000,1,
-                              k=grid[i,"k"],
-                              0.95,
-                              power = grid[i,"beta"],
-                              a1 = grid[i,"a1"],
-                              a2 = grid[i,"a2"],
-                              4)
-  vg_mat[i,] = vg$vmean
-  cat("Progress: i = ", round(i/nrow(grid),4),"\r")
-}
-
-# Plot variogram
-plot(h_grid,vg_mat[19,], type = "l", ylim = c(0,0.3))
-lines(h_grid,vg_mat[20,], col = 'red')
-lines(h_grid,vg_mat[21,], col = 'blue')
-points(geor_vghat$u,vghat_mean)
-
-plot(h_grid,vg_mat[1,], type = "l", ylim = c(0,0.3))
-lines(h_grid,vg_mat[2,], col = 'red')
-lines(h_grid,vg_mat[3,], col = 'blue')
-points(geor_vghat$u,vghat_mean)
-
-# Get the best fitting variogram
-which.min(apply(vg_mat,1,function(x) sqrt(mean((x-vghat_mean)^2))))
-order(apply(vg_mat,1,function(x) sqrt(mean((x-vghat_mean)^2))))
-
-# Save results
-filedir = '/home/johnyannotty/Documents/Dissertation/results/2d_functions/'
-out = list(vg = vg_mat,x = x_train,y = y_train,h = h_grid, pgrid = grid)
-saveRDS(out, paste0(filedir,"taylor_sincos2_thr_variogram_wt_10_30_23.rds"))
-
-
-#-----------------------------------------------------
-# Correlations between weights at fixed inputs
-#-----------------------------------------------------
-plot(fitw$wdraws[[1]][,500],fitw$wdraws[[2]][,350])
-
 
 
 #-----------------------------------------------------
