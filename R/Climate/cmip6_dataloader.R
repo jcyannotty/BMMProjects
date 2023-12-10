@@ -15,9 +15,11 @@ library(dplyr)
 # Read in simulator data
 dirname = "/home/johnyannotty/NOAA_DATA/CMIP6_Interpolations/"
 era5dir = "/home/johnyannotty/NOAA_DATA/ERA5/era5_avg_mon_tas/"
+era5evdir = "/home/johnyannotty/NOAA_DATA/ERA5_Elevations/"
+era5elevname = "NA_elevations.nc"
 sim_list = c(#"bilinear_tas_Amon_ACCESS-CM2_historical_r1i1p1f1_gn_2014.nc",
              #"bilinear_tas_Amon_BCC-CSM2-MR_historical_r1i1p1f1_gn_2014.nc"
-             #"bilinear_tas_Amon_MIROC-ES2L_historical_r1i1p1f2_gn_2014.nc",
+             "bilinear_tas_Amon_MIROC-ES2L_historical_r1i1p1f2_gn_2014.nc",
              #"bilinear_tas_Amon_CMCC-CM2-SR5_historical_r1i1p1f1_gn_2014.nc",
              "bilinear_tas_Amon_CESM2_historical_r1i1p1f1_gn_2014.nc",
              "bilinear_tas_Amon_CNRM-CM6-1-HR_historical_r1i1p1f2_gr_2014.nc"
@@ -41,10 +43,10 @@ era5_lat = ncvar_get(era5,"latitude")
 era5_time_hrs = ncvar_get(era5,"time")
 
 # Data sizes
-n_train = 3000
+n_train = 4000
 max_design = FALSE
 test_grid = TRUE
-test_equal_train = TRUE
+test_equal_train = FALSE
 stepsz = 2 # used for test set
 
 # Locatation and time selection
@@ -172,6 +174,27 @@ if(length(era5_mon_yr) == 1){
 head(f_train)
 head(f_test)
 
+# Add SW USA Elevations
+add_elev = TRUE
+if(add_elev){
+  era5_elev = nc_open(paste0(era5evdir,era5elevname))
+  ev = ncvar_get(era5_elev,"elev")
+  ev_lon = ncvar_get(era5_elev,"lon")
+  ev_lat = ncvar_get(era5_elev,"lat")
+  
+  xx = expand.grid(lat = ev_lat,lon = ev_lon)
+  xx = cbind(lon = xx[,2],lat =  xx[,1])
+  yy = as.vector(ev)
+  xxe = cbind(xx, ev = yy)
+  
+  x_test = data.frame(x_test) %>% left_join(data.frame(xxe))
+  x_test$ev = ifelse(x_test$ev == -999, 0,x_test$ev)
+  
+  x_train = data.frame(x_train) %>% left_join(data.frame(xxe))
+  x_train$ev = ifelse(x_train$ev == -999, 0,x_train$ev)
+}
+
+
 # Dim Check
 if(
   length(y_test) == length(era5_mon_yr)*n_test &
@@ -182,28 +205,6 @@ if(
   nrow(f_train) == length(era5_mon_yr)*(n_train+nadd_train) 
 ){
   cat("------------------------ \n \tPass \n------------------------")
-}
-
-# Add SW USA Elevations
-add_elev = FALSE
-if(add_elev){
-  era5evdir = "/home/johnyannotty/NOAA_DATA/ERA5_Elevations/"
-  era5_elev = nc_open(paste0(era5evdir,"SW_USA.nc"))
-  
-  ev = ncvar_get(era5_elev,"elev")
-  
-  xx = expand.grid(lat = seq(30.25, 59.75, length=60),lon = seq(235, 259.5, length=50))
-  xx = cbind(lon = xx[,2],lat =  xx[,1])
-  yy = as.vector(ev)
-  xxe = cbind(xx, ev = yy)
-  
-  x_test = data.frame(x_test) %>% left_join(data.frame(xxe))
-  
-  x_test$ev = ifelse(x_test$ev == -999, 0,x_test$ev)
-  #x_train$ev = ifelse(x_train$ev == -999, 0,x_train$ev)
-  
-  x_test = as.matrix(x_test) 
-  x_train = x_test
 }
 
 
@@ -242,7 +243,7 @@ sn = gsub("MIROC-ES2L","MIROC",sn)
 sn = gsub("CMCC-CM2-SR5","CMCC",sn)
 sn = gsub("CNRM-CM6-1-HR","CNRM",sn)
 
-desc = "SWUSA_GRID_EV_Dec_2014"
+desc = "NorthAmerica_GRID_EV_Dec_2014"
 
 xx = system(paste("ls",filedir),intern = TRUE)
 #fname = paste0(sn,"_",desc,"_",dt,".rds")

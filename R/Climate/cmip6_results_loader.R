@@ -17,7 +17,7 @@ library(latex2exp)
 #------------------------------------------------
 filedir = "/home/johnyannotty/Documents/CMIP6_mixing/"
 datadir = "Data/"
-resdir = "Results/SWUSA/"
+resdir = "Results/NorthAmerica/"
 #resname = "ACC_BCC_NorthAmerica_Dec_2014_11_08_23_n1000_m50_d4.rds"
 #resname = "ACC_BCC_MIROC_NorthAmerica_Dec_2014_11_08_23_n1000_m50_d4.rds"
 #dataname = "ACC_BCC_NorthAmerica_Dec_2014_11_07_23_n1000.rds"
@@ -25,14 +25,13 @@ dataname = "CMCC_CESM2_NorthAmerica_Dec_2014_11_30_23_n3000.rds"
 resname = "CESM2_CNRM_SWUSA_GRID_EV_Dec_2014_12_03_23.rds"
 sname = "CESM2_CNRM_SWUSA_GRID_EV_Dec_2014_12_03_23.rds"
 
-dataname = "CMCC_CESM2_SWUSA_GRID_EV_Dec_2014_12_03_23_n3000.rds"
-resname = "CMCC_CESM2_SWUSA_GRID_Dec_2014_12_02_23.rds"
-sname = "CMCC_CESM2_SWUSA_GRID_Dec_2014_sdraws_12_02_23.rds"
+dataname = "CESM2_CNRM_NorthAmerica_EV_Dec_2014_12_05_23_n4000.rds"
+resname = "CESM2_CNRM_NorthAmerica_EV_Dec_2014_12_05_23_n4000.rds"
+sname = "CESM2_CNRM_NorthAmerica_EV_Dec_2014_sdraws_12_05_23_n4000.rds"
 
-dataname = "CESM2_CNRM_SWUSA_GRID_EV_Dec_2014_12_03_23_n3000.rds"
-resname = "CESM2_CNRM_SWUSA_GRID_EV_Dec_2014_12_03_23.rds"
-sname = "CESM2_CNRM_SWUSA_GRID_EV_Dec_2014_sdraws_12_03_23.rds"
-
+dataname = "MIROC_CESM2_CNRM_NorthAmerica_EV_Dec_2014_12_06_23_n4000.rds"
+resname = "MIROC_CESM2_CNRM_NorthAmerica_EV_Dec_2014_12_06_23_n4000.rds"
+sname = "MIROC_CESM2_CNRM_NorthAmerica_EV_Dec_2014_sdraws_12_06_23_n4000.rds"
 
 ms = readRDS(paste0(filedir,datadir,dataname))
 fit = readRDS(paste0(filedir,resdir,resname))
@@ -51,50 +50,73 @@ rb = rb + labs(fill = bquote(hat(r)*"(x)"), x = "Longitude", y = "Latitude")
 
 # Simulator 1 residuals
 resid1 = ms$f_test[,1] - ms$y_test
+resid1 = abs(ms$y_test/ms$f_test[,1]) 
 r1 = plot_residuals_hm_gg2(ms$x_test,resid1,xcols = c(1,2), title="Sim1 Residuals", 
                            scale_colors = c("darkblue","gray95","darkred"),
-                           scale_vals = c(-20,0,10)) #c(-3.5,0,3.5)
+                           scale_vals = c(0,1,2)) #c(-3.5,0,3.5)
 r1 = r1 + labs(fill = bquote(hat(r)*"(x)"), x = "Longitude", y = "Latitude")
 
 # Simulator 2 residuals
 resid2 = ms$f_test[,2] - ms$y_test
-r2 = plot_residuals_hm_gg2(ms$x_test,resid2,xcols = c(1,2), title="Sim1 Residuals", 
+resid2 = abs(ms$y_test/ms$f_test[,2])
+r2 = plot_residuals_hm_gg2(ms$x_test,resid2,xcols = c(1,2), title="Sim2 Residuals", 
+                           scale_colors = c("darkblue","gray95","darkred"),
+                           scale_vals = c(0,1,2)) #c(-3.5,0,3.5)
+r2 = r2 + labs(fill = bquote(hat(r)*"(x)"), x = "Longitude", y = "Latitude")
+
+# Simulator 3 residuals
+resid3 = ms$f_test[,3] - ms$y_test
+r3 = plot_residuals_hm_gg2(ms$x_test,resid3,xcols = c(1,2), title="Sim2 Residuals", 
                            scale_colors = c("darkblue","gray95","darkred"),
                            scale_vals = c(-20,0,10)) #c(-3.5,0,3.5)
-r2 = r2 + labs(fill = bquote(hat(r)*"(x)"), x = "Longitude", y = "Latitude")
+r3 = r3 + labs(fill = bquote(hat(r)*"(x)"), x = "Longitude", y = "Latitude")
 
 
 max(fit$wts_mean);min(fit$wts_mean)
 
 w1 = plot_wts_2d_gg2(ms$x_test,fit$wts_mean,wnum = 1,xcols = c(1,2), 
                      scale_colors = c("black","red2","yellow"),
-                     scale_vals = c(-0.1,0,2.5), title = "W1")
-
+                     scale_vals = c(0,0.5,1.0), title = "W1")
 
 
 w2 = plot_wts_2d_gg2(ms$x_test,fit$wts_mean,wnum = 2,xcols = c(1,2), 
                      scale_colors = c("black","red2","yellow"),
-                     scale_vals = c(-0.5,0,1.5), title = "W2")
+                     scale_vals = c(0,0.5,1), title = "W2")
 
 
 w3 = plot_wts_2d_gg2(ms$x_test,fit$wts_mean,wnum = 3,xcols = c(1,2), 
                      scale_colors = c("black","red2","yellow"),
-                     scale_vals = c(-0.5,0.75,2.0))
+                     scale_vals = c(0,0.5,1.0),title = "W3")
+
+
+wsum = plot_wts_2d_gg2(ms$x_test,as.matrix(fit$wsum_mean),wnum = 1,xcols = c(1,2), 
+                     scale_colors = c("black","red2","yellow"),
+                     scale_vals = c(0.5,1,1.5), title = "Wsum")
+
+grid.arrange(w1,w2,w3,nrow = 1)
+grid.arrange(r1,r2,r3,nrow = 1)
+grid.arrange(w1,w2,w3,r1,r2,r3,nrow = 2)
+grid.arrange(w1,w2,wsum,r1,r2,rb,nrow = 2)
 
 # Error Standard Deviation
 hist(unlist(sfit))
 plot(unlist(sfit))
 
 # Prediciton
-p1 = plot_pred_2d_gg2(ms$x_test, fit$pred_mean,title = "BMM", 
-                      scale_vals = c(-22,0,22) #scale_vals = c(-50,0,40)
+pbmm = plot_pred_2d_gg2(ms$x_test, fit$pred_mean,title = "BMM", 
+                      scale_vals = c(-32,0,22) #scale_vals = c(-50,0,40)
                       ) + labs(x = "Longitude", y = "Latitude", 
                                                           fill = "Values")
 
 pdag = plot_pred_2d_gg2(ms$x_test, ms$y_test,title = "ERA5", 
-                        scale_vals = c(-22,0,22) ,#scale_vals = c(-50,0,40)
+                        scale_vals = c(-32,0,22) ,#scale_vals = c(-50,0,40)
                       ) + labs(x = "Longitude", y = "Latitude", 
                                                        fill = "Values")
+
+p2 = plot_pred_2d_gg2(ms$x_test, ms$f_test[,2],title = "Simulator 2", 
+                      scale_vals = c(-32,0,22) #scale_vals = c(-50,0,40)
+) + labs(x = "Longitude", y = "Latitude", 
+         fill = "Values")
 
 
 # Interval width
@@ -125,6 +147,25 @@ w2 = plot_wts_2d_gg2(ms$x_test[h,],fit$wts_mean[h,],wnum = 2,xcols = c(1,2),
                      scale_colors = c("black","red2","yellow"),
                      scale_vals = c(-0.1,0.5,1.1))
 
+# Accurate regions
+arh1 = which(abs(resid1)<abs(resid2) & abs(resid1)<abs(resid3))
+arh2 = which(abs(resid2)<abs(resid1) & abs(resid2)<abs(resid3))
+
+ar = rep(0.5,nrow(x_test))
+ar[arh1] = 1 
+ar[arh2] = 0 
+
+ar = plot_residuals_hm_gg2(x_test, ar,xcols = c(1,2), 
+                           title="Accurate Regions (Red = Access, Blue = BCC)", 
+                           scale_colors = c("darkblue","green3","darkred"),
+                           scale_vals = c(0,0.5,1)) #c(-3.5,0,3.5)
+ar = ar + labs(fill = bquote(hat(r)*"(x)"), x = "Longitude", y = "Latitude")
+ar = ar + theme(axis.text=element_text(size=12),axis.title=element_text(size=13), 
+                plot.title = element_text(size = 14),
+                legend.title = element_text(size = 16))
+ar = ar + theme(legend.position = "none")
+
+grid.arrange(w1,w2,w3,ar,nrow = 2)
 
 #-----------------------------------------------------
 # Precision Weights Empirical Variogram
