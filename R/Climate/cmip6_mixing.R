@@ -34,6 +34,7 @@ era5 = nc_open(paste0(era5dir,"data_1990-2023.nc"))
 
 era5_lon = ncvar_get(era5,"longitude")
 era5_lat = ncvar_get(era5,"latitude")
+era5_lon_merc = ifelse(era5_lon > 180,era5_lon-360,era5_lon)
 era5_time_hrs = ncvar_get(era5,"time")
 
 tunits = ncatt_get(era5,"time","units")
@@ -53,13 +54,17 @@ dim(sim1_tas)
 xgrid = cbind(lon = rep(era5_lon,each = length(era5_lat)),
               lat = rep(era5_lat,length(era5_lon)))
 
-max_lon = 310; min_lon = 235
-max_lat = 70; min_lat = 30
+xgrid[,"lon"] = ifelse(xgrid[,"lon"] > 180,xgrid[,"lon"]-360,xgrid[,"lon"])
+
+min_lon = -180; max_lon = 180
+min_lat = -90; max_lat = -62 
 #max_lon = 260; min_lon = 235
 #max_lat = 60; min_lat = 30
 
 h = which(xgrid[,1] >= min_lon & xgrid[,1] < max_lon & xgrid[,2] >= min_lat & xgrid[,2] < max_lat)
-
+pera5 = plot_pred_2d_gg2(xgrid[h,],as.vector(t(era5_t2m))[h]-273.15,title = "True System", 
+                         scale_vals = c(-40,0,40))
+pera5
 
 #psim1 = plot_pred_2d_gg2(xgrid,as.vector(t(sim1_tas[,,12])),title = "True System", 
 #                        scale_vals = c(-40,0,40))
@@ -79,7 +84,9 @@ era5_t2m = ncvar_get(era5,"t2m",start=c(1,1,1,mon14_ind),
 
 dim(era5_t2m)
 pera5 = plot_pred_2d_gg2(xgrid[h,],as.vector(t(era5_t2m))[h]-273.15,title = "True System", 
-                        scale_vals = c(-20,0,35))
+                        scale_vals = c(-30,-10,10))
+pworld = plot_pred_2d_gg2(xgrid,as.vector(t(era5_t2m))-273.15,title = "True System", 
+                        scale_vals = c(-40,0,40))
 rm(pera5)
 
 n_train = 300
@@ -141,8 +148,8 @@ rho = 1
 sig2_hat = max(apply(apply(f_train, 2, function(x) (x-y_train)^2),2,min))
 lam = rho*sig2_hat*(nu+2)/nu
 q0 = 4
-fit=openbt(x_train,y_train,f_train,pbd=c(1.0,0),ntree = 30,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="cmip6",
-           ndpost = 8000, nskip = 2000, nadapt = 2000, adaptevery = 200, printevery = 500,
+fit=openbt(x_train,y_train,f_train,pbd=c(1.0,0),ntree = 1,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="cmip6",
+           ndpost = 2, nskip = 2, nadapt = 2, adaptevery = 200, printevery = 500,
            power = 2.0, base = 0.95, minnumbot = 3, overallsd = sqrt(sig2_hat), k = 1.0, overallnu = nu,
            summarystats = FALSE, selectp = FALSE, rpath = TRUE, q = 4.0, rshp1 = 2, rshp2 = 10,
            stepwpert = 0.1, probchv = 0.1,maxd = 10)

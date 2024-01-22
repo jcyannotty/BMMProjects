@@ -9,6 +9,8 @@ source("/home/johnyannotty/Documents/openbt/src/openbt_mixing.R")
 source("/home/johnyannotty/Documents/openbt/R/polynomials.R")
 source("/home/johnyannotty/Documents/openbt/R/eft_mixing_helper_functions.R")
 source("/home/johnyannotty/Documents/BayesToolBox/bayestb/Samplers/sampler_functions.R")
+source("/home/johnyannotty/Documents/BayesToolBox/bayestb/Optimization/optimization_helpers.R")
+source("/home/johnyannotty/Documents/BayesToolBox/bayestb/Plotting/computer_expt_plots.R")
 
 library(plotly)
 library(viridis)
@@ -296,16 +298,6 @@ saveRDS(out, paste0(filedir,"pwtrig3_emp_variogram_precwts_11_15_23.rds"))
 
 
 
-# De-trend it
-outlm = lm(log(pw[,1]/(1-pw[,1]))~x_train)
-wfit = exp(outlm$fitted.values)/(1 +  exp(outlm$fitted.values))
-wresi = pw[,1] - wfit
-plot(x_train, pw[,1], col = "black", pch = 16)
-lines(x_train, wfit, col = "red", lwd = 2)
-
-geor_vghat = variog(coords = xdata, data = wresi, uvec=h_grid)
-plot(geor_vghat$u,2*geor_vghat$v)
-
 # For climate models
 plot(x_train[,1],x_train[,2], 
      col = ifelse(pw[,1]>0.75,"black",ifelse(pw[,1]>0.5,"darkred",
@@ -314,6 +306,13 @@ plot(x_train[,1],x_train[,2],
 plot(x_train[,1],x_train[,2], 
      col = ifelse(pw_nn[,1]>0.75,"black",ifelse(pw_nn[,1]>0.5,"darkred",
                                              ifelse(pw_nn[,1]>0.25,"orange2","yellow"))), pch = 16)
+
+# In terms of y
+xdata = cbind(x1 = x_train,x2 = rep(0,n_train))
+ugrid = seq(0.5,max(x_train)-min(x_train),by = 1)
+#geor_vghat = variog(coords = xdata, data = y_train - rowMeans(f_train), uvec = ugrid)
+geor_vghat = variog(coords = xdata, data = f_train[,3], uvec = ugrid)
+plot(ugrid, geor_vghat$v*2)
 
 
 #-------------------------------------------------
@@ -365,13 +364,24 @@ q0 = 4
 
 fit=train.openbtmixing(x_train,y_train,f_train,pbd=c(1.0,0),ntree = 10,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="physics_model",
                        ndpost = 10000, nskip = 2000, nadapt = 5000, adaptevery = 500, printevery = 500,
-                       power = 1.0, base = 0.95, minnumbot = 5, overallsd = sqrt(sig2_hat), k = 2, overallnu = nu,
+                       power = 1.0, base = 0.95, minnumbot = 3, overallsd = sqrt(sig2_hat), k = 1, overallnu = nu,
                        summarystats = FALSE, rpath = TRUE, q = q0, rshp1 = 2, rshp2 = 10,
                        stepwpert = 0.1, probchv = 0.1, batchsize = 1000)
 
 #Get mixed mean function
 fitp=predict.openbtmixing(fit,x.test = x_test, f.test = f_test,tc=4, q.lower = 0.025, q.upper = 0.975,
-                          ptype = "mean_and_sigma")
+                          ptype = "mean_and_proj")
+
+# Sum of the weights
+K= ncol(f_train)
+wsum = 0*fitp$wdraws[[1]]
+for(j in 1:K){
+  wsum = wsum + fitp$wdraws[[j]]
+}
+wsum_mean = apply(wsum,2,mean)
+wsum_lb = apply(wsum,2,quantile, 0.025)
+wsum_ub = apply(wsum,2,quantile, 0.975)
+
 
 plot(x_test, f0_test, pch = 16, cex = 0.8, main = 'Fits', type = 'l',ylim = c(-15,15))
 points(x_train, y_train, pch = 3)
@@ -400,7 +410,6 @@ abline(h = 0, col = 'grey', lty = 'dashed')
 # Plot sigma
 hist(fitp$sdraws[,1])
 
-
 #Get projected mixed mean function
 plot(x_test, f0_test, pch = 16, cex = 0.8, main = 'Fits', type = 'l',ylim = c(-15,15))
 points(x_train, y_train, pch = 3)
@@ -425,7 +434,297 @@ lines(x_test, fitp$pw.lower[,3], col = 'green3', lty = 'dashed', lwd = 1)
 
 rowSums(fitp$pwmean)
 
-xx = cbind(fitp$wdraws[[1]][1:500,1],fitp$wdraws[[2]][1:500,1],fitp$wdraws[[3]][1:500,1])
-cbind(fitp$pwdraws[[1]][1:5,1],fitp$pwdraws[[2]][1:5,1],fitp$pwdraws[[3]][1:5,1])
-rowSums(cbind(fitp$pwdraws[[1]][1:5,1],fitp$pwdraws[[2]][1:5,1],fitp$pwdraws[[3]][1:5,1]))
 
+# Save results
+fit_data = list(
+  pred_mean = fitp$mmean,
+  pred_ub = fitp$m.upper,
+  pred_lb = fitp$m.lower,
+  wts_mean = fitp$wmean,
+  wts_ub = fitp$w.upper,
+  wts_lb = fitp$w.lower,
+  wsum_mean = wsum_mean,
+  wsum_lb = wsum_lb,
+  wsum_ub = wsum_ub,
+  x_train = x_train,
+  y_train = y_train,
+  m = fit$m,
+  k = fit$k,
+  shp1 = fit$rshp1,
+  shp2 = fit$rshp2,
+  minnodesz = fit$minnumbot,
+  q = q0,
+  base = fit$base,
+  power = fit$power,
+  nu = fit$overallnu,
+  lam = fit$overalllambda
+)
+
+# Projection Results
+wts_l2_proj = list(
+  pred_mean = fitp$pmmean,
+  pred_ub = fitp$pm.upper,
+  pred_lb = fitp$pm.lower,
+  wts_mean = fitp$pwmean,
+  wts_ub = fitp$pw.upper,
+  wts_lb = fitp$pw.lower,
+  delta_mean = fitp$dmean,
+  delta_lb = fitp$d.lower,
+  delta_ub = fitp$d.upper
+)
+
+filedir = "/home/johnyannotty/Documents/Dissertation/results/1d_functions/pwtrig3/"
+saveRDS(fit_data, paste0(filedir,"pwtrig3_results4_12_12_23.rds"))
+saveRDS(wts_l2_proj, paste0(filedir,"bmm_wl2_proj_01_17_24.rds"))
+
+
+#------------------------------------------------
+# Manual Softmax projection
+#------------------------------------------------
+library(rBayesianOptimization)
+softmax_l2 = function(tmp){
+  fita = rowSums(f_test*exp(fitp$wmean/tmp)/rowSums(exp(fitp$wmean/tmp)))
+  score = -sum((fitp$mmean - fita)^2) # max the negative loss
+  return(list(Score = score, Pred = 0))
+} 
+
+tmp_bounds = list(tmp = c(0,1))
+init_grid_dt = data.frame(tmp = seq(0.01,0.95, length = 10))
+bayes_temp = BayesianOptimization(FUN = softmax_l2, acq = "ei",
+                                  bounds = tmp_bounds, init_grid_dt = init_grid_dt,
+                                  init_points = 0.8, n_iter = 10)
+
+
+# Plot the loss
+tmp_grid = seq(0.01,0.99,length = 100)
+plot(tmp_grid, sapply(tmp_grid, function(x) softmax_l2(x)$Score),ylim = c(-45,-30))
+points(bayes_temp$Best_Par,bayes_temp$Best_Value,pch = 3, col = "red")
+
+# Set the temperature
+#tmp = bayes_temp$Best_Par # from bayes opt
+tmp = 5
+K = ncol(f_test)
+pwts = list()
+wts_array = array(0,dim = c(dim(fitp$wdraws[[1]]),K))
+
+# Create new array
+for(j in 1:K){
+  wts_array[,,j] = fitp$wdraws[[j]]/tmp
+}
+
+# Get the max
+wtsmax_tmp = apply(wts_array,c(1,2),max)
+
+# Shift wts_array by the max's
+for(j in 1:K){
+  wts_array[,,j] = wts_array[,,j] - wtsmax_tmp
+}
+
+# Project Project Project !!
+pwts_draws = wts_array*0
+for(j in 1:K){
+  pwts_draws[,,j] = exp(wts_array[,,j])
+}
+
+# Normalize
+denom = apply(pwts_draws, c(1,2), sum)
+for(j in 1:K){
+  pwts_draws[,,j] = pwts_draws[,,j]/denom
+}
+
+# Get the predictions
+pf_draws = fitp$mdraws*0
+for(j in 1:K){
+  pf_draws = pf_draws + t(t(pwts_draws[,,j])*f_test[,j])
+}
+
+# Get the discrepancy
+delta_draws = fitp$mdraws - pf_draws
+
+# Summary Stats
+pf_mean = apply(pf_draws,2,mean)
+pf_ub = apply(pf_draws,2,quantile,0.025)
+pf_lb = apply(pf_draws,2,quantile,0.975)
+
+delta_mean = apply(delta_draws,2,mean)
+delta_lb = apply(delta_draws,2,quantile,0.025)
+delta_ub = apply(delta_draws,2,quantile,0.975)
+
+pwts_mean = matrix(0, nrow = nrow(f_test), ncol = K)
+pwts_lb = matrix(0, nrow = nrow(f_test), ncol = K)
+pwts_ub = matrix(0, nrow = nrow(f_test), ncol = K)
+for(j in 1:K){
+  pwts_mean[,j] = apply(pwts_draws[,,j],2,mean)
+  pwts_lb[,j] = apply(pwts_draws[,,j],2,quantile, 0.025)
+  pwts_ub[,j] = apply(pwts_draws[,,j],2,quantile, 0.975)
+}
+
+
+#Get projected mixed mean function
+plot(x_test, f0_test, pch = 16, cex = 0.8, main = 'Fits', type = 'l',ylim = c(-15,15))
+points(x_train, y_train, pch = 3)
+lines(x_test, f_test[,1], col = 'red', lty = 2)
+lines(x_test, f_test[,2], col = 'blue', lty = 2)
+lines(x_test, f_test[,3], col = 'green3', lty = 2)
+lines(x_test, pf_mean, col = 'purple', lwd = 2)
+lines(x_test, pf_lb, col = 'orange', lwd = 2, cex = 0.5)
+lines(x_test, pf_ub, col = 'orange', lwd = 2, cex = 0.5)
+
+#Plot model weights
+plot(x_test, pwts_mean[,1], pch = 16, col = 'red', type = 'l', ylim = c(-1,2.0), lwd = 2, 
+     panel.first = {grid(col = 'lightgrey')})
+lines(x_test, pwts_mean[,2], col = 'blue', lwd = 2)
+lines(x_test, pwts_mean[,3], col = 'green3', lwd = 2)
+lines(x_test, pwts_ub[,1], col = 'red', lty = 'dashed', lwd = 1)
+lines(x_test, pwts_lb[,1], col = 'red', lty = 'dashed', lwd = 1)
+lines(x_test, pwts_ub[,2], col = 'blue', lty = 'dashed', lwd = 1)
+lines(x_test, pwts_lb[,2], col = 'blue', lty = 'dashed', lwd = 1)
+lines(x_test, pwts_ub[,3], col = 'green3', lty = 'dashed', lwd = 1)
+lines(x_test, pwts_lb[,3], col = 'green3', lty = 'dashed', lwd = 1)
+
+
+# Plot the discrepancy
+plot(x_test, delta_mean, pch = 16, cex = 0.8, main = 'Delta', type = 'l',ylim = c(-15,15))
+lines(x_test, delta_lb, col = 'orange', lwd = 2, cex = 0.5)
+lines(x_test, delta_ub, col = 'orange', lwd = 2, cex = 0.5)
+
+softmax_res = list(
+  pred_mean = pf_mean,
+  pred_lb = pf_lb,
+  pred_ub = pf_ub,
+  wts_mean = pwts_mean,
+  wts_lb = pwts_lb,
+  wts_ub = pwts_ub,
+  delta_mean = delta_mean,
+  delta_lb = delta_lb,
+  delta_ub = delta_ub,
+  tmp = tmp 
+)
+
+filedir = "/home/johnyannotty/Documents/Dissertation/results/1d_functions/pwtrig3/"
+saveRDS(softmax_res, paste0(filedir,"bmm_softmax_proj6_01_17_24.rds"))
+
+#------------------------------------------------
+# Non-negative Projection
+#------------------------------------------------
+# Draws
+# Nonnegative Porjection.....!
+pwts_draws = array(0, dim = c(dim(fitp$wdraws[[1]]), ncol(f_test)))
+for(j in 1:K){
+  pwts_draws[,,j] = (abs(fitp$wdraws[[j]]) + fitp$wdraws[[j]])/2
+}
+
+# Get the predictions
+pf_draws = fitp$mdraws*0
+for(j in 1:K){
+  pf_draws = pf_draws + t(t(pwts_draws[,,j])*f_test[,j])
+}
+
+# Get the discrepancy
+delta_draws = fitp$mdraws - pf_draws
+
+# Summary Stats
+pf_mean = apply(pf_draws,2,mean)
+pf_ub = apply(pf_draws,2,quantile,0.025)
+pf_lb = apply(pf_draws,2,quantile,0.975)
+
+delta_mean = apply(delta_draws,2,mean)
+delta_lb = apply(delta_draws,2,quantile,0.025)
+delta_ub = apply(delta_draws,2,quantile,0.975)
+
+pwts_mean = matrix(0, nrow = nrow(f_test), ncol = K)
+pwts_lb = matrix(0, nrow = nrow(f_test), ncol = K)
+pwts_ub = matrix(0, nrow = nrow(f_test), ncol = K)
+for(j in 1:K){
+  pwts_mean[,j] = apply(pwts_draws[,,j],2,mean)
+  pwts_lb[,j] = apply(pwts_draws[,,j],2,quantile, 0.025)
+  pwts_ub[,j] = apply(pwts_draws[,,j],2,quantile, 0.975)
+}
+
+
+# Save the non-negative projection results
+nonneg_res = list(
+  pred_mean = pf_mean,
+  pred_lb = pf_lb,
+  pred_ub = pf_ub,
+  wts_mean = pwts_mean,
+  wts_lb = pwts_lb,
+  wts_ub = pwts_ub,
+  delta_mean = delta_mean,
+  delta_lb = delta_lb,
+  delta_ub = delta_ub
+)
+
+filedir = "/home/johnyannotty/Documents/Dissertation/results/1d_functions/pwtrig3/"
+saveRDS(softmax_res, paste0(filedir,"bmm_nonneg_proj_01_17_24.rds"))
+
+
+#------------------------------------------------
+# Bounds on the sum of wts
+#------------------------------------------------
+e_train = matrix(y_train, ncol = 3, nrow = n_train, byrow = FALSE) - f_train
+xind = c(5:6)
+mbest = which.min(colSums(e_train[xind,]^2))
+
+Delta_bnd = sqrt(sum((3*e_train[xind,mbest])^2))
+err_bnd = sqrt(sum(e_train[xind,mbest]^2))
+ynorm = sqrt(sum(y_train[xind]^2))
+B = (Delta_bnd + err_bnd)/ynorm
+c(1-B,1+B)
+
+
+#------------------------------------------------
+# Discrepancy and sum-of-wts
+#------------------------------------------------
+delta_test = matrix(f0_test, ncol = 3, nrow = n_test, byrow = FALSE) - f_test
+wgrid = expand.grid(seq(-0.4,1.4, length = 60),
+                    seq(-0.4,1.4, length = 60))
+
+# Fix a wt 
+wgrid = cbind(rep(0.4,nrow(wgrid)),wgrid)
+wgrid = wgrid[which(rowSums(wgrid)<1.4),]
+colnames(wgrid) = c("w1","w2","w3")
+
+bias = 0
+for(i in 1:nrow(wgrid)){
+  if(length(xind)>1){
+    bias[i] = mean(t(t(delta_test[xind,])*wgrid[i,])) + mean(f0_test[xind]*(1-sum(wgrid[i,])))  
+  }else{
+    bias[i] = sum(delta_test[xind,]*wgrid[i,]) + f0_test[xind]*(1-sum(wgrid[i,]))
+  }
+}
+  
+pbias = plot_mean2d_viridis(wgrid[,2:3],bias^2, 
+                                  viridis_opt = "viridis",
+                                  scale_limit = c(0,25), title = "Bias^2") 
+
+hp = which(wgrid[,2]>0 & wgrid[,2]<0.6 & wgrid[,3]>0 & wgrid[,3]<0.6)
+pbias_sub = plot_mean2d_viridis(wgrid[hp,2:3],bias[hp]^2, 
+                            viridis_opt = "viridis",
+                            scale_limit = c(0,15), title = "Bias^2") 
+hist(bias^2)
+max(bias[hp]^2)
+
+# Fix a wt 
+agrid = expand.grid(seq(0,1, length = 60),
+                    seq(0,1, length = 60))
+
+agrid = cbind(rep(0.4,nrow(agrid)),agrid)
+agrid = agrid[which(rowSums(agrid)<=1 & rowSums(agrid)>0),]
+colnames(agrid) = c("w1","w2","w3")
+
+abias = 0
+for(i in 1:nrow(agrid)){
+  if(length(xind)>1){
+    abias[i] = mean(t(t(delta_test)*agrid[i,])) + mean(f0_test*(1-sum(agrid[i,])))    
+  }else{
+    abias[i] = sum(delta_test[xind,]*agrid[i,]) + f0_test[xind]*(1-sum(agrid[i,]))
+  }
+}
+
+pabias = plot_mean2d_viridis(agrid[,2:3],abias^2, 
+                            viridis_opt = "viridis",
+                            scale_limit = c(0,15), title = "Bias^2") 
+
+hist(abias^2)
+max(abias^2)

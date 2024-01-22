@@ -16,10 +16,10 @@ library(dplyr)
 dirname = "/home/johnyannotty/NOAA_DATA/CMIP6_Interpolations/"
 era5dir = "/home/johnyannotty/NOAA_DATA/ERA5/era5_avg_mon_tas/"
 era5evdir = "/home/johnyannotty/NOAA_DATA/ERA5_Elevations/"
-era5elevname = "NA_elevations.nc"
-sim_list = c(#"bilinear_tas_Amon_ACCESS-CM2_historical_r1i1p1f1_gn_2014.nc",
-             #"bilinear_tas_Amon_BCC-CSM2-MR_historical_r1i1p1f1_gn_2014.nc"
-             "bilinear_tas_Amon_MIROC-ES2L_historical_r1i1p1f2_gn_2014.nc",
+era5elevname = "bilinear_copernicus_altitude.nc"
+sim_list = c("bilinear_tas_Amon_ACCESS-CM2_historical_r1i1p1f1_gn_2014.nc",
+             "bilinear_tas_Amon_BCC-CSM2-MR_historical_r1i1p1f1_gn_2014.nc",
+             #"bilinear_tas_Amon_MIROC-ES2L_historical_r1i1p1f2_gn_2014.nc",
              #"bilinear_tas_Amon_CMCC-CM2-SR5_historical_r1i1p1f1_gn_2014.nc",
              "bilinear_tas_Amon_CESM2_historical_r1i1p1f1_gn_2014.nc",
              "bilinear_tas_Amon_CNRM-CM6-1-HR_historical_r1i1p1f2_gr_2014.nc"
@@ -40,22 +40,23 @@ for(i in 1:length(sim_list)){
 era5 = nc_open(paste0(era5dir,"data_1990-2023.nc"))
 era5_lon = ncvar_get(era5,"longitude")
 era5_lat = ncvar_get(era5,"latitude")
+era5_lon_merc = ifelse(era5_lon>180,era5_lon-360,era5_lon)
 era5_time_hrs = ncvar_get(era5,"time")
 
 # Data sizes
-n_train = 4000
-max_design = FALSE
+n_train = rep(5000,6)
+max_design = TRUE
 test_grid = TRUE
 test_equal_train = FALSE
 stepsz = 2 # used for test set
 
 # Locatation and time selection
-#max_lon = 260; min_lon = 235
-#max_lat = 60; min_lat = 30
-max_lon = 310; min_lon = 235
-max_lat = 70; min_lat = 30
+#min_lon = 235; max_lon = 260 
+#min_lat = 30; max_lat = 60
+min_lon = -180; max_lon = 180
+min_lat = -90; max_lat = 0
 #mon_list = c("06","12")
-mon_list = c("12")
+mon_list = c("02","04","06","08","10","12")
 yr_list = c("14")
 
 # Additional regions (lon_min, lon_max, lat_min, lat_max)
@@ -75,7 +76,7 @@ era5_time = chron(era5_time_hrs/24,origin=c(tmonth, tday, tyear))
 
 
 # Create lon and lat grid
-xgrid = cbind(lon = rep(era5_lon,each = length(era5_lat)),
+xgrid = cbind(lon = rep(era5_lon_merc,each = length(era5_lat)),
               lat = rep(era5_lat,length(era5_lon)))
 
 # Get grid subset
@@ -88,17 +89,22 @@ mon_yr_list = expand.grid(mon = mon_list, yr = yr_list)
 era5_mon_yr = which(era5_time %in% paste0(mon_yr_list$mon,"/01/",mon_yr_list$yr))
 
 # Build training and testing sets
-if(max_design){
-  xlist = list()
-  xlist[[1]] = unique(xgrid[h,"lon"])
-  xlist[[2]] = sort(unique(xgrid[h,"lat"]))
-  alist = c(min_lon, min_lat)
-  blist = c(max_lon, max_lat)
-  lon_lat_train = max_distance_design(alist, blist, 0, n_train, 50, xgrid = xlist)
-  x_train_ind = apply(lon_lat_train,1,function(x) which(x[1] == xgrid[,1] & x[2] == xgrid[,2] ))
-}else{
-  # Random design
-  x_train_ind = sample(h, size = n_train)
+x_train_ind = c()
+for(i in 1:length(n_train)){
+  if(max_design){
+    xlist = list()
+    xlist[[1]] = unique(xgrid[h,"lon"])
+    xlist[[2]] = sort(unique(xgrid[h,"lat"]))
+    alist = c(min_lon, min_lat)
+    blist = c(max_lon, max_lat)
+    lon_lat_train = max_distance_design(alist, blist, 0, n_train[i], 10, xgrid = xlist)
+    x_train_ind_temp = apply(lon_lat_train,1,function(x) which(x[1] == xgrid[,1] & x[2] == xgrid[,2]))
+    x_train_ind = c(x_train_ind,x_train_ind_temp)
+  }else{
+    # Random design
+    x_train_ind_temp = sample(h, size = n_train[i])
+    x_train_ind = c(x_train_ind,x_train_ind_temp)
+  }
 }
 
 # Add to specific regions
@@ -120,7 +126,8 @@ if(add_data){
   nadd_train = 0
 }
 
-x_test_lon = era5_lon[which(era5_lon<max_lon & era5_lon>=min_lon)]
+#x_test_lon = era5_lon[which(era5_lon<max_lon & era5_lon>=min_lon)]
+x_test_lon = era5_lon_merc[which(era5_lon_merc<max_lon & era5_lon_merc>=min_lon)]
 x_test_lat = era5_lat[which(era5_lat<max_lat & era5_lat>=min_lat)]
 hlon = seq(1,length(x_test_lon),by=stepsz)
 hlat = seq(1,length(x_test_lat),by=stepsz)
@@ -141,17 +148,19 @@ y_test = c()
 f_train = matrix(0,nrow = 0, ncol = length(sim_list))
 f_test = matrix(0,nrow = 0, ncol = length(sim_list))
 
+nstart = c(0,cumsum(n_train))+1
 for(i in 1:length(era5_mon_yr)){
   mon = as.numeric(paste(mon_yr_list[i,"mon"]))
   yr = as.numeric(paste(mon_yr_list[i,"yr"]))
   era5_t2m = ncvar_get(era5,"t2m",start=c(1,1,1,era5_mon_yr[i]),
                        count = c(nlon,nlat,1,1))
   
-  x_train = rbind(x_train,cbind(xgrid[x_train_ind,],rep(i,length(x_train_ind))))
-  y_train = c(y_train,as.vector(t(era5_t2m))[x_train_ind]-273.15)
-  f_train_temp = matrix(0,nrow = length(x_train_ind), ncol = K)
+  xtind = x_train_ind[nstart[i]:(nstart[i+1]-1)]
+  x_train = rbind(x_train,cbind(xgrid[xtind,],rep(i,length(xtind))))
+  y_train = c(y_train,as.vector(t(era5_t2m))[xtind]-273.15)
+  f_train_temp = matrix(0,nrow = length(xtind), ncol = K)
   for(j in 1:K){
-    f_train_temp[,j] = as.vector(t(sim_tas[[j]][,,mon]))[x_train_ind]
+    f_train_temp[,j] = as.vector(t(sim_tas[[j]][,,mon]))[xtind]
   }
   f_train = rbind(f_train, f_train_temp)
   
@@ -173,8 +182,9 @@ if(length(era5_mon_yr) == 1){
 # Sanity check
 head(f_train)
 head(f_test)
+tail(x_train)
 
-# Add SW USA Elevations
+# Add Elevations
 add_elev = TRUE
 if(add_elev){
   era5_elev = nc_open(paste0(era5evdir,era5elevname))
@@ -182,9 +192,13 @@ if(add_elev){
   ev_lon = ncvar_get(era5_elev,"lon")
   ev_lat = ncvar_get(era5_elev,"lat")
   
-  xx = expand.grid(lat = ev_lat,lon = ev_lon)
-  xx = cbind(lon = xx[,2],lat =  xx[,1])
-  yy = as.vector(ev)
+  
+  xx = cbind(lon = rep(ev_lon,each = length(ev_lat)),
+                lat = rep(ev_lat,length(ev_lon)))
+  
+  #xx = expand.grid(lat = ev_lat,lon = ev_lon)
+  #xx = cbind(lon = xx[,2],lat =  xx[,1])
+  yy = as.vector(t(ev))
   xxe = cbind(xx, ev = yy)
   
   x_test = data.frame(x_test) %>% left_join(data.frame(xxe))
@@ -194,15 +208,14 @@ if(add_elev){
   x_train$ev = ifelse(x_train$ev == -999, 0,x_train$ev)
 }
 
-
 # Dim Check
 if(
   length(y_test) == length(era5_mon_yr)*n_test &
   nrow(x_test) == length(era5_mon_yr)*n_test & 
   nrow(f_test) == length(era5_mon_yr)*n_test &
-  length(y_train) == length(era5_mon_yr)*(n_train+nadd_train) &
-  nrow(x_train) == length(era5_mon_yr)*(n_train+nadd_train) &
-  nrow(f_train) == length(era5_mon_yr)*(n_train+nadd_train) 
+  length(y_train) == (sum(n_train)+nadd_train) &
+  nrow(x_train) == (sum(n_train)+nadd_train) &
+  nrow(f_train) == (sum(n_train)+nadd_train) 
 ){
   cat("------------------------ \n \tPass \n------------------------")
 }
@@ -213,7 +226,6 @@ rm(xgrid)
 rm(sim_tas)
 rm(era5_t2m)
 nc_close(era5)
-
 
 # Save data
 filedir = '/home/johnyannotty/Documents/CMIP6_mixing/Data/'
@@ -243,16 +255,16 @@ sn = gsub("MIROC-ES2L","MIROC",sn)
 sn = gsub("CMCC-CM2-SR5","CMCC",sn)
 sn = gsub("CNRM-CM6-1-HR","CNRM",sn)
 
-desc = "NorthAmerica_GRID_EV_Dec_2014"
-
-xx = system(paste("ls",filedir),intern = TRUE)
+desc = "SH_6M14"
+ffold = "South_Hemisphere/"
+xx = system(paste0("ls ",filedir,ffold),intern = TRUE)
 #fname = paste0(sn,"_",desc,"_",dt,".rds")
-fname = paste0(sn,"_",desc,"_",dt,"_n",n_train,".rds")
+fname = paste0(sn,"_",desc,"_",dt,"_n",sum(n_train),".rds")
 
 if(fname %in% xx){
   cat("------------------------ \n \tCheck Name \n------------------------")  
 }else{
-  saveRDS(out_data, paste0(filedir,fname))
+  saveRDS(out_data, paste0(filedir,ffold,fname))
   cat("------------------------ \n \tSaved Data \n------------------------")
 }
 

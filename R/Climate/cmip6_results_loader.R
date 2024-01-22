@@ -16,14 +16,16 @@ library(latex2exp)
 #------------------------------------------------
 #------------------------------------------------
 filedir = "/home/johnyannotty/Documents/CMIP6_mixing/"
-datadir = "Data/"
-resdir = "Results/NorthAmerica/"
-#resname = "ACC_BCC_NorthAmerica_Dec_2014_11_08_23_n1000_m50_d4.rds"
-#resname = "ACC_BCC_MIROC_NorthAmerica_Dec_2014_11_08_23_n1000_m50_d4.rds"
-#dataname = "ACC_BCC_NorthAmerica_Dec_2014_11_07_23_n1000.rds"
-dataname = "CMCC_CESM2_NorthAmerica_Dec_2014_11_30_23_n3000.rds"
-resname = "CESM2_CNRM_SWUSA_GRID_EV_Dec_2014_12_03_23.rds"
-sname = "CESM2_CNRM_SWUSA_GRID_EV_Dec_2014_12_03_23.rds"
+datadir = "Data/North_Hemisphere/"
+resdir = "Results/North_Hemisphere/"
+
+dataname = "CESM2_CNRM_SWUSA_GRID_EV_Dec_2014_12_03_23_n3000.rds"
+resname = "CESM2_CNRM_SWUSA_GRID_EV_Dec_2014_12_12_23_n3000.rds"
+sname = "CESM2_CNRM_SWUSA_GRID_EV_Dec_2014_sdraws_12_12_23_n3000.rds"
+
+dataname = "CESM2_CNRM_NorthAmerica_GRID_EV_Dec_2014_12_05_23_n12000.rds"
+resname = "CESM2_CNRM_NorthAmerica_Dec_2014_12_25_23_n12000.rds"
+sname = "CESM2_CNRM_NorthAmerica_Dec_2014_sdraws_12_25_23_n12000.rds"
 
 dataname = "CESM2_CNRM_NorthAmerica_EV_Dec_2014_12_05_23_n4000.rds"
 resname = "CESM2_CNRM_NorthAmerica_EV_Dec_2014_12_05_23_n4000.rds"
@@ -33,9 +35,48 @@ dataname = "MIROC_CESM2_CNRM_NorthAmerica_EV_Dec_2014_12_06_23_n4000.rds"
 resname = "MIROC_CESM2_CNRM_NorthAmerica_EV_Dec_2014_12_06_23_n4000.rds"
 sname = "MIROC_CESM2_CNRM_NorthAmerica_EV_Dec_2014_sdraws_12_06_23_n4000.rds"
 
+
+#------------------------------------------------
+# Batch Loader
+#------------------------------------------------
+ffold = "nh_6month_2014_n30k_hp1/"
+dataname = "ACC_BCC_CESM2_CNRM_NH_6M14_01_06_24_n30000.rds"
+fls = system(paste0("ls ",filedir,resdir,ffold),intern = TRUE)
+batch = 0
 ms = readRDS(paste0(filedir,datadir,dataname))
-fit = readRDS(paste0(filedir,resdir,resname))
-sfit = readRDS(paste0(filedir,resdir,sname))
+for(i in 1:length(fls)){
+  if(grepl("batch",fls[i])){
+    batch = batch + 1
+    temp_fit = readRDS(paste0(filedir,resdir,ffold,fls[i]))
+    if(batch == 1){
+      fit = temp_fit
+    }else{
+      fit = list(
+        pred_mean = c(fit$pred_mean,temp_fit$pred_mean),
+        pred_ub = c(fit$pred_ub,temp_fit$pred_ub),
+        pred_lb = c(fit$pred_lb,temp_fit$pred_lb),
+        wts_mean = rbind(fit$wts_mean,temp_fit$wts_mean),
+        wts_ub = rbind(fit$wts_ub,temp_fit$wts_ub),
+        wts_lb = rbind(fit$wts_lb,temp_fit$wts_lb),
+        wsum_mean = c(fit$wsum_mean,temp_fit$wsum_mean),
+        wsum_lb = c(fit$wsum_lb,temp_fit$wsum_lb),
+        wsum_ub = c(fit$wsum_ub,temp_fit$wsum_ub)
+        #proj_mean = temp_fit$pmmean,
+        #proj_ub = temp_fit$pm.upper,
+        #proj_lb = temp_fit$pm.lower,
+        #pwts_mean = temp_fit$pwmean,
+        #pwts_ub = temp_fit$pw.upper,
+        #pwts_lb = temp_fit$pw.lower,
+        #delta_mean = temp_fit$dmean,
+        #delta_lb = temp_fit$d.lower,
+        #delta_ub = temp_fit$d.upper
+        )
+    }
+  }else if(grepl("sdraws",fls[i])){
+    sfit = readRDS(paste0(filedir,resdir,ffold,fls[i]))
+  }
+}
+
 
 resid = fit$pred_mean - ms$y_test
 sqrt(mean(resid^2))
@@ -50,43 +91,42 @@ rb = rb + labs(fill = bquote(hat(r)*"(x)"), x = "Longitude", y = "Latitude")
 
 # Simulator 1 residuals
 resid1 = ms$f_test[,1] - ms$y_test
-resid1 = abs(ms$y_test/ms$f_test[,1]) 
+#resid1 = abs(ms$y_test/ms$f_test[,1]) 
 r1 = plot_residuals_hm_gg2(ms$x_test,resid1,xcols = c(1,2), title="Sim1 Residuals", 
                            scale_colors = c("darkblue","gray95","darkred"),
-                           scale_vals = c(0,1,2)) #c(-3.5,0,3.5)
+                           scale_vals = c(-25,0,25)) #c(-3.5,0,3.5)
 r1 = r1 + labs(fill = bquote(hat(r)*"(x)"), x = "Longitude", y = "Latitude")
 
 # Simulator 2 residuals
 resid2 = ms$f_test[,2] - ms$y_test
-resid2 = abs(ms$y_test/ms$f_test[,2])
+#resid2 = abs(ms$y_test/ms$f_test[,2])
 r2 = plot_residuals_hm_gg2(ms$x_test,resid2,xcols = c(1,2), title="Sim2 Residuals", 
                            scale_colors = c("darkblue","gray95","darkred"),
-                           scale_vals = c(0,1,2)) #c(-3.5,0,3.5)
+                           scale_vals = c(-25,0,25)) #c(-3.5,0,3.5)
 r2 = r2 + labs(fill = bquote(hat(r)*"(x)"), x = "Longitude", y = "Latitude")
 
 # Simulator 3 residuals
 resid3 = ms$f_test[,3] - ms$y_test
 r3 = plot_residuals_hm_gg2(ms$x_test,resid3,xcols = c(1,2), title="Sim2 Residuals", 
                            scale_colors = c("darkblue","gray95","darkred"),
-                           scale_vals = c(-20,0,10)) #c(-3.5,0,3.5)
+                           scale_vals = c(-25,0,25)) #c(-3.5,0,3.5)
 r3 = r3 + labs(fill = bquote(hat(r)*"(x)"), x = "Longitude", y = "Latitude")
 
 
 max(fit$wts_mean);min(fit$wts_mean)
-
 w1 = plot_wts_2d_gg2(ms$x_test,fit$wts_mean,wnum = 1,xcols = c(1,2), 
                      scale_colors = c("black","red2","yellow"),
-                     scale_vals = c(0,0.5,1.0), title = "W1")
+                     scale_vals = c(-0.8,0.5,1.5), title = "W1")
 
 
 w2 = plot_wts_2d_gg2(ms$x_test,fit$wts_mean,wnum = 2,xcols = c(1,2), 
                      scale_colors = c("black","red2","yellow"),
-                     scale_vals = c(0,0.5,1), title = "W2")
+                     scale_vals = c(-0.8,0.5,1.5), title = "W2")
 
 
 w3 = plot_wts_2d_gg2(ms$x_test,fit$wts_mean,wnum = 3,xcols = c(1,2), 
                      scale_colors = c("black","red2","yellow"),
-                     scale_vals = c(0,0.5,1.0),title = "W3")
+                     scale_vals = c(-0.8,0.5,1.5),title = "W3")
 
 
 wsum = plot_wts_2d_gg2(ms$x_test,as.matrix(fit$wsum_mean),wnum = 1,xcols = c(1,2), 
@@ -104,14 +144,14 @@ plot(unlist(sfit))
 
 # Prediciton
 pbmm = plot_pred_2d_gg2(ms$x_test, fit$pred_mean,title = "BMM", 
-                      scale_vals = c(-32,0,22) #scale_vals = c(-50,0,40)
+                      scale_vals = c(-45,0,30) #scale_vals = c(-50,0,40)
                       ) + labs(x = "Longitude", y = "Latitude", 
                                                           fill = "Values")
 
 pdag = plot_pred_2d_gg2(ms$x_test, ms$y_test,title = "ERA5", 
-                        scale_vals = c(-32,0,22) ,#scale_vals = c(-50,0,40)
-                      ) + labs(x = "Longitude", y = "Latitude", 
-                                                       fill = "Values")
+                        scale_vals = c(-45,0,30) ,#scale_vals = c(-50,0,40)
+                      ) + labs(x = "Longitude", y = "Latitude", fill = "Values")
+
 
 p2 = plot_pred_2d_gg2(ms$x_test, ms$f_test[,2],title = "Simulator 2", 
                       scale_vals = c(-32,0,22) #scale_vals = c(-50,0,40)
@@ -127,12 +167,19 @@ pw1 = plot_residuals_hm_gg2(ms$x_test,pred_width,xcols = c(1,2), title="BMM Mean
                            scale_vals = c(-0.5,15,30)) #c(-3.5,0,3.5)
 
 
+# Projected Prediction
+pbmm = plot_pred_2d_gg2(ms$x_test, fit$pred_mean,title = "BMM", 
+                        scale_vals = c(-32,0,22) #scale_vals = c(-50,0,40)
+) + labs(x = "Longitude", y = "Latitude", 
+         fill = "Values")
+
+
 
 # Multiple time periods
-h = which(ms$x_test[,3] == 2)
+h = which(ms$x_test[,3] == 6 & ms$x_test[,1] > (0))
 r1 = plot_residuals_hm_gg2(ms$x_test[h,],resid[h],xcols = c(1,2), title="BMM Mean Residuals", 
                            scale_colors = c("darkblue","gray95","darkred"),
-                           scale_vals = c(-25,0,25)) #c(-3.5,0,3.5)
+                           scale_vals = c(-6,0,6)) #c(-3.5,0,3.5)
 r1 = r1 + labs(fill = bquote(hat(r)*"(x)"), x = "Longitude", y = "Latitude")
 
 
@@ -140,12 +187,67 @@ max(fit$wts_mean);min(fit$wts_mean)
 
 w1 = plot_wts_2d_gg2(ms$x_test[h,],fit$wts_mean[h,],wnum = 1,xcols = c(1,2), 
                      scale_colors = c("black","red2","yellow"),
-                     scale_vals = c(-0.1,0.5,1.1))
-
+                     scale_vals = c(0.5,0.5,1.5))
 
 w2 = plot_wts_2d_gg2(ms$x_test[h,],fit$wts_mean[h,],wnum = 2,xcols = c(1,2), 
                      scale_colors = c("black","red2","yellow"),
-                     scale_vals = c(-0.1,0.5,1.1))
+                     scale_vals = c(0.5,0.5,1.5))
+
+w3 = plot_wts_2d_gg2(ms$x_test[h,],fit$wts_mean[h,],wnum = 3,xcols = c(1,2), 
+                     scale_colors = c("black","red2","yellow"),
+                     scale_vals = c(0.5,0.5,1.5))
+
+w4 = plot_wts_2d_gg2(ms$x_test[h,],fit$wts_mean[h,],wnum = 4,xcols = c(1,2), 
+                     scale_colors = c("black","red2","yellow"),
+                     scale_vals = c(0.5,0.5,1.5))
+
+grid.arrange(w1+theme(legend.position = "bottom"),
+             w2+theme(legend.position = "bottom"),
+             w3+theme(legend.position = "bottom"),
+             w4+theme(legend.position = "bottom"),nrow = 1)
+
+# Weight Slices
+hw = which(ms$x_test[,3] == 6 & ms$x_test[,1] == 100)
+plot(ms$x_test[hw,2],fit$wts_mean[hw,1], col = 'red',type = 'l', ylim = c(-0.8,2))
+lines(ms$x_test[hw,2],fit$wts_mean[hw,2], col = 'blue')
+lines(ms$x_test[hw,2],fit$wts_mean[hw,3], col = 'green3')
+lines(ms$x_test[hw,2],fit$wts_mean[hw,4], col = 'orange')
+lines(ms$x_test[hw,2],fit$wts_ub[hw,1], col = 'red',lty = 'dashed')
+lines(ms$x_test[hw,2],fit$wts_ub[hw,2], col = 'blue',lty = 'dashed')
+lines(ms$x_test[hw,2],fit$wts_ub[hw,3], col = 'green3',lty = 'dashed')
+lines(ms$x_test[hw,2],fit$wts_ub[hw,4], col = 'orange',lty = 'dashed')
+lines(ms$x_test[hw,2],fit$wts_lb[hw,1], col = 'red',lty = 'dashed')
+lines(ms$x_test[hw,2],fit$wts_lb[hw,2], col = 'blue',lty = 'dashed')
+lines(ms$x_test[hw,2],fit$wts_lb[hw,3], col = 'green3',lty = 'dashed')
+lines(ms$x_test[hw,2],fit$wts_lb[hw,4], col = 'orange',lty = 'dashed')
+
+
+# Predictions
+pbmm = plot_pred_2d_gg2(ms$x_test[h,c(1,2)], fit$pred_mean[h],title = "BMM", 
+                        scale_vals = c(-45,0,30) #scale_vals = c(-50,0,40)
+) + labs(x = "Longitude", y = "Latitude", 
+         fill = "Values")
+
+pdag = plot_pred_2d_gg2(ms$x_test[h,c(1,2)], ms$y_test[h],title = "ERA5", 
+                        scale_vals = c(-45,0,30) ,#scale_vals = c(-50,0,40)
+) + labs(x = "Longitude", y = "Latitude", fill = "Values")
+
+
+grid.arrange(pbmm,pdag,nrow = 1)
+
+p1 = plot_pred_2d_gg2(ms$x_test[h,c(1,2)], ms$f_test[h,1],title = "Sim1", 
+                        scale_vals = c(-45,0,30) ,#scale_vals = c(-50,0,40)
+) + labs(x = "Longitude", y = "Latitude", fill = "Values")
+
+
+# Interval width
+pred_width = fit$pred_ub - fit$pred_lb
+hist(pred_width)
+pw1 = plot_residuals_hm_gg2(ms$x_test[h,],pred_width[h],xcols = c(1,2), 
+                            title="BMM Mean Residuals", 
+                            scale_colors = c("white","blue","midnightblue"),
+                            scale_vals = c(0,3,6)) #c(-3.5,0,3.5)
+hist(pred_width[h])
 
 # Accurate regions
 arh1 = which(abs(resid1)<abs(resid2) & abs(resid1)<abs(resid3))
@@ -278,3 +380,25 @@ order(apply(vg_mat,1,function(x) sqrt(mean((x-vghat_mean)^2))))
 # Save results
 out = list(vg = vg_mat,x = x_train,y = y_train,h = h_grid, pgrid = grid)
 saveRDS(out, paste0(filedir,"cmip6_northamerica500_thr_variogram_wt_11_15_23.rds"))
+
+
+#----------------------------------------------------------
+# Extra Code
+#----------------------------------------------------------
+h = which(ms$x_test[,3] < 500 & ms$x_test[,3] > 100)
+wtm = fit$wts_mean 
+wtm[-h,] = -10  
+w1 = plot_wts_2d_gg2(ms$x_test,wtm,wnum = 1,xcols = c(1,2), 
+                     scale_colors = c("black","red2","yellow"),
+                     scale_vals = c(-0.8,0.5,1.5), title = "W1")
+
+
+w2 = plot_wts_2d_gg2(ms$x_test,wtm,wnum = 2,xcols = c(1,2), 
+                     scale_colors = c("black","red2","yellow"),
+                     scale_vals = c(-0.8,0.5,1.5), title = "W2")
+
+
+w3 = plot_wts_2d_gg2(ms$x_test,wtm,wnum = 3,xcols = c(1,2), 
+                     scale_colors = c("black","red2","yellow"),
+                     scale_vals = c(-0.8,0.5,1.5),title = "W3")
+

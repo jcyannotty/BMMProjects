@@ -1,0 +1,345 @@
+#------------------------------------------------
+# CMIP6 Data Pre-Analysis
+#------------------------------------------------
+setwd("/home/johnyannotty/Documents/openbt/src")
+source("/home/johnyannotty/Documents/openbt/src/openbt_mixing.R")
+source("/home/johnyannotty/Documents/openbt/R/eft_mixing_helper_functions.R")
+source("/home/johnyannotty/Documents/BayesToolBox/bayestb/GaussianProcesses/kernels.R")
+
+library(ncdf4)
+library(chron)
+library(lattice)
+library(RColorBrewer)
+library(plotly)
+library(viridis)
+library(latex2exp)
+library(geoR)
+
+filedir = "/home/johnyannotty/Documents/CMIP6_mixing/"
+datadir = "Data/South_Hemisphere/"
+resdir = "Results/South_Hemisphere/"
+ffold = "nh_6month_2014_n30k/"
+dataname = "ACC_BCC_CESM2_CNRM_NH_6M14_01_06_24_n30000.rds"
+
+ms = readRDS(paste0(filedir,datadir,dataname))
+
+#-------------------------------------------------
+# Theoretical Variogram
+#-------------------------------------------------
+# Theoretical
+xbnds = t(apply(ms$x_test,2,range))
+#xbnds = matrix(c(xmin,xmax),ncol = 2, byrow = TRUE)
+# drop time
+xbnds = xbnds[-3,]
+hgrid = seq(0.5,80,by = 1.5)
+
+# Grid Search
+param_list = list(k = c(0.5,0.8,1,2), a1 = c(2,5,10), a2 = c(5,20,40),
+                  power = c(0.5,1))
+param_grid = expand.grid(param_list)
+vg_matrix = matrix(0,nrow = nrow(param_grid), ncol = length(hgrid))
+for(i in 1:nrow(param_grid)){
+  vg = variogram.openbtmixing(xbnds,hgrid,10000,1,
+                              k=param_grid[i,"k"],
+                              0.95,
+                              power = param_grid[i,"power"],
+                              a1 = param_grid[i,"a1"],
+                              a2 = param_grid[i,"a2"],
+                              4,
+                              maxd = 5)
+  vg_matrix[i,] = vg$vmean
+  cat("Progress: ", round(i/nrow(vg_matrix),4)*100)
+}
+
+plot(h_grid,vg$vmean, type = "l", ylim = c(0,0.3))
+
+# Save results
+out = list(vg = vg_matrix, xbnds = xbnds, h = hgrid, pgrid = param_grid,
+           dataref = paste0(filedir,datadir,dataname))
+saveRDS(out, paste0(filedir,"Variograms/wts_nhem_n30000.rds"))
+
+
+#-------------------------------------------------
+# Precision Weights for Variogram
+#-------------------------------------------------
+# Precision Weight calculation
+pw_se = apply(ms$f_train,2,function(x) (ms$y_train-x)^2)
+pw_denom = rowSums(1/pw_se)
+pw = (1/pw_se)/pw_denom
+#rowSums(pw)
+
+# Get nearest neightbors
+#knn = 2
+#d = abs(outer(ms$x_train,ms$x_train, "-"))
+#d = outer(x_train[,1],x_train[,1], "-")^2 + outer(x_train[,2],x_train[,2], "-")^2
+#nn = t(matrix(apply(d,1,function(x) order(x)[2:(knn+1)]),nrow = knn))
+#pw_nn = 0*pw
+
+#for(i in 1:nrow(ms$x_train)){
+  #ind = c(i,nn[i,])
+  #pw_se_nn = apply(pw_se[ind,],2,sum)
+  #pw_nn[i,] = (1/pw_se_nn)/sum(1/pw_se_nn)
+#}
+
+rowSums(pw_nn)
+plot(pw[,2])
+plot(pw_nn[,1])
+
+xdata = ms$x_train[,c(1,2,4)]
+vghat = c() 
+vghat_nn = c()
+#h_grid = seq(0.9,max(x_train)-min(x_train),by = 1)
+ugrid = seq(0.5,80,by = 1)
+K = ncol(ms$f_train)
+for(j in 1:K){
+  geor_vghat = variog(coords = xdata, data = pw[,j],uvec = ugrid)
+  vgh = 2*geor_vghat$v
+  vghat = cbind(vghat,vgh)
+  
+  #geor_vghat = variog(coords = xdata, data = pw_nn[,j],uvec = ugrid)
+  #vgh = 2*geor_vghat$v
+  #vghat_nn = cbind(vghat_nn,vgh)
+}
+
+colnames(vghat) = paste0("vw",1:K)
+colnames(vghat_nn) = paste0("vw",1:K)
+
+
+# Plot the empirical variogram for the mean weight
+vghat_mean = rowMeans(vghat)
+plot(geor_vghat$u,vghat_mean, ylim = c(0,0.2))
+
+plot(geor_vghat$u,vghat[,3], ylim = c(0,0.2))
+abline(h = 2*var(pw[,3]))
+
+# Save results
+#out = list(vghat = vghat,vghat_nn = vghat_nn,hgrid = geor_vghat$u, 
+#           what = pw, what_nn = pw_nn, x = x_train,y = y_train)
+#saveRDS(out, paste0(filedir,"pwtrig3_emp_variogram_precwts_11_15_23.rds"))
+
+
+
+# For climate models
+ind = 4
+plot(ms$x_train[,1],ms$x_train[,2], 
+     col = ifelse(pw[,ind]>0.75,"black",
+                  ifelse(pw[,ind]>0.5,"darkred",
+                        ifelse(pw[,ind]>0.25,"orange2","yellow"))), pch = 16,cex = 0.5)
+
+#-------------------------------------------------
+# Variogram in terms of y
+#-------------------------------------------------
+# In terms of y
+xdata = ms$x_train[,c(1,2,4)]
+ugrid = seq(0.5,80,by = 1.5)
+
+#geor_vghat = variog(coords = xdata, data = ms$y_train - rowMeans(ms$f_train), uvec = ugrid)
+#geor_vghat = variog(coords = xdata, data = ms$y_train, uvec = ugrid)
+
+geor_vghat1 = variog(coords = xdata, data = ms$f_train[,1], uvec = ugrid)
+geor_vghat2 = variog(coords = xdata, data = ms$f_train[,2], uvec = ugrid)
+geor_vghat3 = variog(coords = xdata, data = ms$f_train[,3], uvec = ugrid)
+geor_vghat4 = variog(coords = xdata, data = ms$f_train[,4], uvec = ugrid)
+geor_vghaty = variog(coords = xdata, data = ms$y_train, uvec = ugrid)
+
+plot(geor_vghaty$u, geor_vghaty$v*2, ylim = c(0,1700), type = 'l', col='black')
+lines(geor_vghat1$u, geor_vghat1$v*2, col='red')
+lines(geor_vghat2$u, geor_vghat2$v*2, col='blue')
+lines(geor_vghat3$u, geor_vghat3$v*2, col='green')
+lines(geor_vghat4$u, geor_vghat4$v*2, col='orange')
+
+empvg_out = list(u = geor_vghaty$u, evg_y = 2*geor_vghaty$v, 
+     evg_f = 2*cbind(f1=geor_vghat1$v, f2=geor_vghat2$v, f3=geor_vghat3$v, f4=geor_vghat4$v),
+     dataref = paste0(filedir,datadir,dataname))
+
+saveRDS(empvg_out, paste0(filedir,"Variograms/empvg_shem_n30000.rds"))
+
+#-------------------------------------------------
+# Variogram in terms of fx
+hgrid = seq(0.5,80,by = 1.5)
+p = 3
+#sqr_exp_kernel(0,rep(10/p,p),1,c(70,20))
+
+sc2 = 150
+nug = 75
+plot(geor_vghaty$u, geor_vghaty$v*2, ylim = c(0,1000), type = 'l', col='black')
+lines(geor_vghat1$u, geor_vghat4$v*2, col='red')
+Rxvec = sapply(hgrid,function(x) sqr_exp_kernel(0,rep(x/sqrt(p)),sqrt(sc2),c(480,480,480)))
+points(hgrid,2*(sc2-Rxvec + nug))
+
+plot(Rxvec)
+
+plot(hgrid,200-Rxvec)
+
+# x bounds
+xbnds = t(apply(ms$x_test,2,range))
+xbnds = xbnds[-3,]
+#h_grid = seq(0.1,80,by = 0.1)
+xgrid = cbind(runif(10000,xbnds[1,1],xbnds[1,2]),
+              runif(10000,xbnds[2,1],xbnds[2,2]),
+              runif(10000,xbnds[3,1],xbnds[3,2])
+              )
+
+# Grid Search
+param_list = list(k = c(0.5,0.8,1), a1 = c(2,10), a2 = c(20,40),
+                  power = c(0.5,1))
+param_grid = expand.grid(param_list)
+vg_matrix = matrix(0,nrow = nrow(param_grid), ncol = length(hgrid))
+
+for(i in 1:nrow(param_grid)){
+  vg = variogram.openbtmixing(xbnds[1:3,],hgrid,10000,1,
+                              k=param_grid[i,"k"],
+                              0.95,
+                              power = param_grid[i,"power"],
+                              a1 = param_grid[i,"a1"],
+                              a2 = param_grid[i,"a2"],
+                              4,
+                              ncut = 1000,
+                              beta = 0.25,
+                              sigma2 = 1,
+                              maxd = 5,
+                              xgrid = xgrid,
+                              rgrid = Rxvec,
+                              fmean = 7.35,
+                              rscale = 320,
+                              type = "y"
+  )
+  vg_matrix[i,] = vg$vmean
+  cat("Progress: ", round(i/nrow(vg_matrix),4)*100)
+}
+
+
+vg = variogram.openbtmixing(xbnds[1:3,],hgrid,10000,1,
+                            k=1.0,
+                            0.95,
+                            power = 0.5,
+                            a1 = 2,
+                            a2 = 40,
+                            4,
+                            ncut = 1000,
+                            beta = 0.25,
+                            sigma2 = 1,
+                            maxd = 5,
+                            xgrid = xgrid,
+                            rgrid = Rxvec,
+                            fmean = 7.35,
+                            rscale = 220+55,
+                            type = "y"
+)
+
+plot(hgrid,vg$vmean, type = "l", ylim = c(100,1000))
+lines(geor_vghaty$u, geor_vghaty$v*2,col='blue')
+lines(geor_vghat1$u, geor_vghat1$v*2, col='red')
+points(hgrid,2*(200-Rxvec) + 110)
+abline(h = 2*var(ms$f_train[,1]))
+
+
+#-------------------------------------------------
+# Variogram in terms of fx
+hgrid = seq(0.5,80,by = 1.5)
+p = 3
+#sqr_exp_kernel(0,rep(10/p,p),1,c(70,20))
+sc0 = 300
+nug0 = 35
+lam0 = 400
+plot(geor_vghaty$u, geor_vghaty$v*2, ylim = c(0,1700), type = 'l', col='black')
+lines(geor_vghat2$u, geor_vghat1$v*2, col='red')
+Rxvec = sapply(hgrid,function(x) sqr_exp_kernel(0,rep(x/sqrt(p)),sqrt(sc0),c(lam0,lam0,lam0)))
+points(hgrid, 2*(sc0-Rxvec + nug0))
+
+# x bounds
+xbnds = t(apply(ms$x_test,2,range))
+xbnds = xbnds[-3,]
+#h_grid = seq(0.1,80,by = 0.1)
+xgrid = cbind(runif(10000,xbnds[1,1],xbnds[1,2]),
+              runif(10000,xbnds[2,1],xbnds[2,2]),
+              runif(10000,xbnds[3,1],xbnds[3,2])
+)
+
+# Grid Search
+fmeans = apply(ms$f_train,2,mean)
+#scale_list = c(150,150,150,150)
+#nug_list = c(70,70,65,75)
+#lc_list = c(450,450,480,480)
+
+scale_list = c(300,300,300,300)
+nug_list = c(35,25,30,30)
+lc_list = c(400,400,400,400)
+Rxvec_list = list(
+  sapply(hgrid,function(x) sqr_exp_kernel(0,rep(x/sqrt(p)),sqrt(scale_list[1]),rep(lc_list[1],3))),
+  sapply(hgrid,function(x) sqr_exp_kernel(0,rep(x/sqrt(p)),sqrt(scale_list[2]),rep(lc_list[2],3))),
+  sapply(hgrid,function(x) sqr_exp_kernel(0,rep(x/sqrt(p)),sqrt(scale_list[3]),rep(lc_list[3],3))),
+  sapply(hgrid,function(x) sqr_exp_kernel(0,rep(x/sqrt(p)),sqrt(scale_list[4]),rep(lc_list[4],3)))
+)
+param_list = list(k = c(1,1.25,1.5), a1 = c(2,10), a2 = c(10,20,40),power = c(0.5,1))
+param_grid = expand.grid(param_list)
+vg_out = matrix(0,nrow = nrow(param_grid), ncol = length(hgrid))
+vg_matrix = matrix(0,nrow = 4, ncol = length(hgrid))
+for(j in 1:nrow(param_grid)){
+  for(i in 1:ncol(ms$f_train)){
+    vg = variogram.openbtmixing(xbnds[1:3,],hgrid,10000,1,
+                                k=param_grid[j,"k"],
+                                0.95,
+                                power = param_grid[j,"power"],
+                                a1 = param_grid[j,"a1"],
+                                a2 = param_grid[j,"a2"],
+                                4,
+                                ncut = 1000,
+                                beta = 0.25,
+                                sigma2 = 1,
+                                maxd = 5,
+                                xgrid = xgrid,
+                                rgrid = Rxvec_list[[i]],
+                                fmean = fmeans[i],
+                                rscale = scale_list[i]+nug_list[i],
+                                type = "y"
+    )
+    vg_matrix[i,] = vg$vmean
+  }
+  cat("Progress: ", round(j/nrow(param_grid),4)*100)
+  vg_out[j,] = apply(vg_matrix,2,sum)
+}
+
+plot(hgrid,vg$vmean, type = "l", ylim = c(100,1000))
+
+plot(hgrid,apply(vg_matrix,2,sum), type = "l", ylim = c(100,1000))
+lines(geor_vghaty$u, geor_vghaty$v*2,col='blue')
+lines(geor_vghat1$u, geor_vghat1$v*2, col='red')
+
+# Save results
+out = list(vg = vg_out, xbnds = xbnds, h = hgrid, pgrid = param_grid,
+           fmean = fmeans, Rxvec_list = Rxvec_list,
+           scale2_list = scale_list, len_scale_list = lc_list,
+           nug_list = nug_list, sigma2 =1, kernels = "sqr_exponential",
+           dataref = paste0(filedir,datadir,dataname))
+saveRDS(out, paste0(filedir,"Variograms/vgy_shem_n30000.rds"))
+
+
+#-------------------------------------------------
+# Scratch....
+library(GPfit)
+apply(ms$f_train,2,mean)
+
+n_train = nrow(ms$x_train)
+h = sample(n_train, size = 300)
+h = sort(h)
+
+hp = sample(n_train, size = 2000)
+hp = sort(hp)
+
+x_scale = apply(ms$x_train,2,function(x) (x - min(x))/(max(x) - min(x)))
+
+gp1 = GP_fit(x_scale[h,], ms$f_train[h,1])
+gp1$beta
+gp1$sig2
+gp1$correlation_param
+
+gp1_pred = predict(gp1, x_scale[hp,])
+mean((gp1_pred$Y_hat - ms$f_train[hp,1])^2)
+max((gp1_pred$Y_hat - ms$f_train[hp,1])^2)
+
+x_scale = apply(ms$x_train,2,function(x) (x - min(x))/(max(x) - min(x)))
+hmat = expand.grid(h,h)
+Rx = apply(hmat,1,function(x) sqr_exp_kernel(x_scale[x[1],],x_scale[x[2],],1,1))
+Rx = matrix(Rx, nrow = length(h))
+
