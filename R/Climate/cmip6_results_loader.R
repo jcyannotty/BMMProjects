@@ -16,16 +16,12 @@ library(latex2exp)
 #------------------------------------------------
 #------------------------------------------------
 filedir = "/home/johnyannotty/Documents/CMIP6_mixing/"
-datadir = "Data/North_Hemisphere/"
-resdir = "Results/North_Hemisphere/"
+datadir = "Data/North_America/"
+resdir = "Results/North_America/"
 
 dataname = "CESM2_CNRM_SWUSA_GRID_EV_Dec_2014_12_03_23_n3000.rds"
 resname = "CESM2_CNRM_SWUSA_GRID_EV_Dec_2014_12_12_23_n3000.rds"
 sname = "CESM2_CNRM_SWUSA_GRID_EV_Dec_2014_sdraws_12_12_23_n3000.rds"
-
-dataname = "CESM2_CNRM_NorthAmerica_GRID_EV_Dec_2014_12_05_23_n12000.rds"
-resname = "CESM2_CNRM_NorthAmerica_Dec_2014_12_25_23_n12000.rds"
-sname = "CESM2_CNRM_NorthAmerica_Dec_2014_sdraws_12_25_23_n12000.rds"
 
 dataname = "CESM2_CNRM_NorthAmerica_EV_Dec_2014_12_05_23_n4000.rds"
 resname = "CESM2_CNRM_NorthAmerica_EV_Dec_2014_12_05_23_n4000.rds"
@@ -39,8 +35,11 @@ sname = "MIROC_CESM2_CNRM_NorthAmerica_EV_Dec_2014_sdraws_12_06_23_n4000.rds"
 #------------------------------------------------
 # Batch Loader
 #------------------------------------------------
-ffold = "nh_6month_2014_n30k_hp1/"
-dataname = "ACC_BCC_CESM2_CNRM_NH_6M14_01_06_24_n30000.rds"
+ffold = "na_Dec2014_n4000_proj1/"
+dataname = "CESM2_CNRM_NorthAmerica_EV_Dec_2014_12_05_23_n4000.rds"
+
+#ffold = "nh_6month_2014_n30k_hp1/"
+#dataname = "ACC_BCC_CESM2_CNRM_NH_6M14_01_06_24_n30000.rds"
 fls = system(paste0("ls ",filedir,resdir,ffold),intern = TRUE)
 batch = 0
 ms = readRDS(paste0(filedir,datadir,dataname))
@@ -60,16 +59,16 @@ for(i in 1:length(fls)){
         wts_lb = rbind(fit$wts_lb,temp_fit$wts_lb),
         wsum_mean = c(fit$wsum_mean,temp_fit$wsum_mean),
         wsum_lb = c(fit$wsum_lb,temp_fit$wsum_lb),
-        wsum_ub = c(fit$wsum_ub,temp_fit$wsum_ub)
-        #proj_mean = temp_fit$pmmean,
-        #proj_ub = temp_fit$pm.upper,
-        #proj_lb = temp_fit$pm.lower,
-        #pwts_mean = temp_fit$pwmean,
-        #pwts_ub = temp_fit$pw.upper,
-        #pwts_lb = temp_fit$pw.lower,
-        #delta_mean = temp_fit$dmean,
-        #delta_lb = temp_fit$d.lower,
-        #delta_ub = temp_fit$d.upper
+        wsum_ub = c(fit$wsum_ub,temp_fit$wsum_ub),
+        proj_mean = c(fit$proj_mean,temp_fit$proj_mean),
+        proj_ub = c(fit$proj_ub,temp_fit$proj_ub),
+        proj_lb = c(fit$proj_lb,temp_fit$proj_lb),
+        pwts_mean = rbind(fit$pwts_mean,temp_fit$pwts_mean),
+        pwts_ub = rbind(fit$pwts_ub,temp_fit$pwts_ub),
+        pwts_lb = rbind(fit$pwts_lb,temp_fit$pwts_lb),
+        delta_mean = c(fit$delta_mean,temp_fit$delta_mean),
+        delta_lb = c(fit$delta_lb,temp_fit$delta_lb),
+        delta_ub = c(fit$delta_lb,temp_fit$delta_ub)
         )
     }
   }else if(grepl("sdraws",fls[i])){
@@ -164,18 +163,37 @@ pred_width = fit$pred_ub - fit$pred_lb
 hist(pred_width)
 pw1 = plot_residuals_hm_gg2(ms$x_test,pred_width,xcols = c(1,2), title="BMM Mean Residuals", 
                            scale_colors = c("darkblue","gray95","darkred"),
-                           scale_vals = c(-0.5,15,30)) #c(-3.5,0,3.5)
+                           scale_vals = c(0,10,20)) #c(-3.5,0,3.5)
 
 
-# Projected Prediction
-pbmm = plot_pred_2d_gg2(ms$x_test, fit$pred_mean,title = "BMM", 
-                        scale_vals = c(-32,0,22) #scale_vals = c(-50,0,40)
-) + labs(x = "Longitude", y = "Latitude", 
-         fill = "Values")
+#------------------------------------------------
+# Weight Projections
+#------------------------------------------------
+pbmm = plot_pred_2d_gg2(ms$x_test, fit$proj_mean,title = "BMM", 
+                        scale_vals = c(-45,0,30)) + 
+  labs(x = "Longitude", y = "Latitude",fill = "Values")
+         
+
+dbmm = plot_pred_2d_gg2(ms$x_test, fit$delta_mean,title = "BMM", 
+                        scale_vals = c(-10,0,10)) + 
+  labs(x = "Longitude", y = "Latitude",fill = "Values")
+
+
+w1 = plot_wts_2d_gg2(ms$x_test,fit$pwts_mean,wnum = 1,xcols = c(1,2), 
+                     scale_colors = c("black","red2","yellow"),
+                     scale_vals = c(0,0.5,1), title = "W1")
+
+
+w2 = plot_wts_2d_gg2(ms$x_test,fit$pwts_mean,wnum = 2,xcols = c(1,2), 
+                     scale_colors = c("black","red2","yellow"),
+                     scale_vals = c(0,0.5,1), title = "W2")
 
 
 
+
+#------------------------------------------------
 # Multiple time periods
+#------------------------------------------------
 h = which(ms$x_test[,3] == 6 & ms$x_test[,1] > (0))
 r1 = plot_residuals_hm_gg2(ms$x_test[h,],resid[h],xcols = c(1,2), title="BMM Mean Residuals", 
                            scale_colors = c("darkblue","gray95","darkred"),

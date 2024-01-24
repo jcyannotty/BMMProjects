@@ -19,22 +19,12 @@ era5evdir = "/home/johnyannotty/NOAA_DATA/ERA5_Elevations/"
 era5elevname = "bilinear_copernicus_altitude.nc"
 sim_list = c("bilinear_tas_Amon_ACCESS-CM2_historical_r1i1p1f1_gn_2014.nc",
              "bilinear_tas_Amon_BCC-CSM2-MR_historical_r1i1p1f1_gn_2014.nc",
-             #"bilinear_tas_Amon_MIROC-ES2L_historical_r1i1p1f2_gn_2014.nc",
-             #"bilinear_tas_Amon_CMCC-CM2-SR5_historical_r1i1p1f1_gn_2014.nc",
+             #"bilinear_tas_Amon_MIROC-ES2L_historical_r1i1p1f2_gn_2000-2014.nc",
+             #"bilinear_tas_Amon_CMCC-CM2-SR5_historical_r1i1p1f1_gn_2000-2014.nc",
              "bilinear_tas_Amon_CESM2_historical_r1i1p1f1_gn_2014.nc",
              "bilinear_tas_Amon_CNRM-CM6-1-HR_historical_r1i1p1f2_gr_2014.nc"
              )
 K = length(sim_list)
-sim_tas = list()
-for(i in 1:length(sim_list)){
-  temp_sim = nc_open(paste0(dirname,sim_list[i]))
-  temp_tas = ncvar_get(temp_sim, "tas")
-  sim_tas[[i]] = temp_tas
-  #assign(paste0("sim",i), temp_sim)
-  #assign(paste0("sim",i,"_tas"), temp_tas)
-  rm(temp_tas)
-  rm(temp_sim)
-}
 
 # Era5 data
 era5 = nc_open(paste0(era5dir,"data_1990-2023.nc"))
@@ -44,20 +34,18 @@ era5_lon_merc = ifelse(era5_lon>180,era5_lon-360,era5_lon)
 era5_time_hrs = ncvar_get(era5,"time")
 
 # Data sizes
-n_train = rep(5000,6)
 max_design = TRUE
 test_grid = TRUE
 test_equal_train = FALSE
 stepsz = 2 # used for test set
 
 # Locatation and time selection
-#min_lon = 235; max_lon = 260 
-#min_lat = 30; max_lat = 60
 min_lon = -180; max_lon = 180
-min_lat = -90; max_lat = 0
-#mon_list = c("06","12")
-mon_list = c("02","04","06","08","10","12")
-yr_list = c("14")
+min_lat = -90; max_lat = 90
+mon_list = c("06","12")
+#mon_list = c("02","04","06","08","10","12")
+yr_list = c("10","11","12","13","14")
+n_train = rep(5000,length(yr_list)*length(mon_list))
 
 # Additional regions (lon_min, lon_max, lat_min, lat_max)
 add_data = FALSE
@@ -126,6 +114,7 @@ if(add_data){
   nadd_train = 0
 }
 
+# Setup the test grid
 #x_test_lon = era5_lon[which(era5_lon<max_lon & era5_lon>=min_lon)]
 x_test_lon = era5_lon_merc[which(era5_lon_merc<max_lon & era5_lon_merc>=min_lon)]
 x_test_lat = era5_lat[which(era5_lat<max_lat & era5_lat>=min_lat)]
@@ -141,6 +130,7 @@ if(test_equal_train){
   x_train_ind = x_test_ind
 }
 
+# Get train and test sets
 x_train = matrix(0,nrow = 0, ncol = 3)
 x_test = matrix(0,nrow = 0, ncol = 3)
 y_train = c()
@@ -159,6 +149,17 @@ for(i in 1:length(era5_mon_yr)){
   x_train = rbind(x_train,cbind(xgrid[xtind,],rep(i,length(xtind))))
   y_train = c(y_train,as.vector(t(era5_t2m))[xtind]-273.15)
   f_train_temp = matrix(0,nrow = length(xtind), ncol = K)
+  
+  sim_tas = list()
+  for(i in 1:length(sim_list)){
+    simname = gsub("2014.nc",paste0("20",yr,".nc"),sim_list[i])
+    temp_sim = nc_open(paste0(dirname,simname))
+    temp_tas = ncvar_get(temp_sim, "tas")
+    sim_tas[[i]] = temp_tas
+    rm(temp_tas)
+    rm(temp_sim)
+  }
+  
   for(j in 1:K){
     f_train_temp[,j] = as.vector(t(sim_tas[[j]][,,mon]))[xtind]
   }
@@ -172,6 +173,7 @@ for(i in 1:length(era5_mon_yr)){
   f_test = rbind(f_test, f_test_temp)
   y_test = c(y_test,as.vector(t(era5_t2m))[x_test_ind]-273.15)
 }
+
 
 # Remove the time index if needed
 if(length(era5_mon_yr) == 1){
@@ -255,8 +257,8 @@ sn = gsub("MIROC-ES2L","MIROC",sn)
 sn = gsub("CMCC-CM2-SR5","CMCC",sn)
 sn = gsub("CNRM-CM6-1-HR","CNRM",sn)
 
-desc = "SH_6M14"
-ffold = "South_Hemisphere/"
+desc = "W_2M_2010-2014"
+ffold = "World/"
 xx = system(paste0("ls ",filedir,ffold),intern = TRUE)
 #fname = paste0(sn,"_",desc,"_",dt,".rds")
 fname = paste0(sn,"_",desc,"_",dt,"_n",sum(n_train),".rds")

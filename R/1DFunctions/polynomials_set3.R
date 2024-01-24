@@ -362,15 +362,18 @@ sig2_hat = max(apply(apply(f_train, 2, function(x) (x-y_train)^2),2,min))
 lam = rho*sig2_hat*(nu+2)/nu
 q0 = 4
 
-fit=train.openbtmixing(x_train,y_train,f_train,pbd=c(1.0,0),ntree = 10,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="physics_model",
+fit=train.openbtmixing(x_train,y_train,as.matrix(rep(1,n_train)),pbd=c(1.0,0),ntree = 30,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="physics_model",
                        ndpost = 10000, nskip = 2000, nadapt = 5000, adaptevery = 500, printevery = 500,
-                       power = 1.0, base = 0.95, minnumbot = 3, overallsd = sqrt(sig2_hat), k = 1, overallnu = nu,
+                       power = 1.0, base = 0.95, minnumbot = 3, overallsd = sqrt(sig2_hat), k = 0.10, overallnu = nu,
                        summarystats = FALSE, rpath = TRUE, q = q0, rshp1 = 2, rshp2 = 10,
                        stepwpert = 0.1, probchv = 0.1, batchsize = 1000)
 
+#openbt.save(fit,fname = "/home/johnyannotty/Documents/temp_res.obt")
+
+
 #Get mixed mean function
-fitp=predict.openbtmixing(fit,x.test = x_test, f.test = f_test,tc=4, q.lower = 0.025, q.upper = 0.975,
-                          ptype = "mean_and_proj")
+fitp=predict.openbtmixing(fit,x.test = x_test, f.test = as.matrix(rep(1,n_test)),tc=4, q.lower = 0.025, q.upper = 0.975,
+                          ptype = "mean", proj_type = "softmax", temperature = 0.2)
 
 # Sum of the weights
 K= ncol(f_train)
@@ -501,8 +504,7 @@ plot(tmp_grid, sapply(tmp_grid, function(x) softmax_l2(x)$Score),ylim = c(-45,-3
 points(bayes_temp$Best_Par,bayes_temp$Best_Value,pch = 3, col = "red")
 
 # Set the temperature
-#tmp = bayes_temp$Best_Par # from bayes opt
-tmp = 5
+tmp = 0.20 #bayes_temp$Best_Par # from bayes opt
 K = ncol(f_test)
 pwts = list()
 wts_array = array(0,dim = c(dim(fitp$wdraws[[1]]),K))
