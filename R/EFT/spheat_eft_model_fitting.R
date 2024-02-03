@@ -251,12 +251,16 @@ points(g_train[-odds], pred_lg_train$pred_mean, col = "blue", pch = 12)
 ms = list(
   fsg_train = pred_sg_train$pred_mean,
   fsg_test = pred_sg$pred_mean,
+  fsg_test_lb = pred_sg$pred_mean - 2*pred_sg$pred_sd,
+  fsg_test_ub = pred_sg$pred_mean + 2*pred_sg$pred_sd,
   fsg_grid = fsg_grid,
   a = gvec[14],
   aind = 14,
   
   flg_train = pred_lg_train$pred_mean,
   flg_test = pred_lg$pred_mean,
+  flg_test_lb = pred_lg$pred_mean - 2*pred_lg$pred_sd,
+  flg_test_ub = pred_lg$pred_mean + 2*pred_lg$pred_sd,
   flg_grid = flg_grid,
   b = gvec[84],
   bind = 84,
@@ -264,6 +268,7 @@ ms = list(
   g_interp = g_train[odds],
   g_train = g_train[-odds],
   g_test = g_test,
+  gvec = gvec,
 
   y_train = y_train[-odds],
   y_interp = y_train[odds],

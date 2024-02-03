@@ -13,11 +13,27 @@ library(plotly)
 library(viridis)
 library(latex2exp)
 
+# Helper to order result names
+order_fnames = function(fls){
+  fls_split = sapply(fls,function(x) strsplit(x,"batch"))
+  fls_new = fls
+  for(i in 1:length(fls_split)){
+    if(length(fls_split[[i]])>1){
+      if(nchar(fls_split[[i]][2])< 7){
+        fls_new[i] = paste0(fls_split[[i]][1], "batch0",fls_split[[i]][2])
+      }  
+    }
+  }
+  fls = fls[order(fls_new)]
+  return(fls)
+}
+
+
 #------------------------------------------------
 #------------------------------------------------
 filedir = "/home/johnyannotty/Documents/CMIP6_mixing/"
-datadir = "Data/North_America/"
-resdir = "Results/North_America/"
+datadir = "Data/World/"
+resdir = "Results/World/"
 
 dataname = "CESM2_CNRM_SWUSA_GRID_EV_Dec_2014_12_03_23_n3000.rds"
 resname = "CESM2_CNRM_SWUSA_GRID_EV_Dec_2014_12_12_23_n3000.rds"
@@ -38,9 +54,10 @@ sname = "MIROC_CESM2_CNRM_NorthAmerica_EV_Dec_2014_sdraws_12_06_23_n4000.rds"
 ffold = "na_Dec2014_n4000_proj1/"
 dataname = "CESM2_CNRM_NorthAmerica_EV_Dec_2014_12_05_23_n4000.rds"
 
-#ffold = "nh_6month_2014_n30k_hp1/"
-#dataname = "ACC_BCC_CESM2_CNRM_NH_6M14_01_06_24_n30000.rds"
+ffold = "World_JD2010-2014_hp1/"
+dataname = "ACC_BCC_CESM2_CNRM_W_2M_2010-2014_01_22_24_n50000.rds"
 fls = system(paste0("ls ",filedir,resdir,ffold),intern = TRUE)
+fls = order_fnames(fls)
 batch = 0
 ms = readRDS(paste0(filedir,datadir,dataname))
 for(i in 1:length(fls)){
@@ -194,8 +211,10 @@ w2 = plot_wts_2d_gg2(ms$x_test,fit$pwts_mean,wnum = 2,xcols = c(1,2),
 #------------------------------------------------
 # Multiple time periods
 #------------------------------------------------
-h = which(ms$x_test[,3] == 6 & ms$x_test[,1] > (0))
-r1 = plot_residuals_hm_gg2(ms$x_test[h,],resid[h],xcols = c(1,2), title="BMM Mean Residuals", 
+#h = which(ms$x_test[,3] == 6 & ms$x_test[,1] > (0))
+resid = fit$pred_mean[h] - ms$y_test[h]
+h = 1:(length(ms$y_test)/10)
+r1 = plot_residuals_hm_gg2(ms$x_test[h,],resid,xcols = c(1,2), title="BMM Mean Residuals", 
                            scale_colors = c("darkblue","gray95","darkred"),
                            scale_vals = c(-6,0,6)) #c(-3.5,0,3.5)
 r1 = r1 + labs(fill = bquote(hat(r)*"(x)"), x = "Longitude", y = "Latitude")
@@ -205,11 +224,11 @@ max(fit$wts_mean);min(fit$wts_mean)
 
 w1 = plot_wts_2d_gg2(ms$x_test[h,],fit$wts_mean[h,],wnum = 1,xcols = c(1,2), 
                      scale_colors = c("black","red2","yellow"),
-                     scale_vals = c(0.5,0.5,1.5))
+                     scale_vals = c(-1,0.5,2.5))
 
 w2 = plot_wts_2d_gg2(ms$x_test[h,],fit$wts_mean[h,],wnum = 2,xcols = c(1,2), 
                      scale_colors = c("black","red2","yellow"),
-                     scale_vals = c(0.5,0.5,1.5))
+                     scale_vals = c(-1,0.5,2.5))
 
 w3 = plot_wts_2d_gg2(ms$x_test[h,],fit$wts_mean[h,],wnum = 3,xcols = c(1,2), 
                      scale_colors = c("black","red2","yellow"),
