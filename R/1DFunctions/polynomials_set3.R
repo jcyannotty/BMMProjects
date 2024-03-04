@@ -297,62 +297,6 @@ out = list(vghat = vghat,vghat_nn = vghat_nn,hgrid = geor_vghat$u,
 saveRDS(out, paste0(filedir,"pwtrig3_emp_variogram_precwts_11_15_23.rds"))
 
 
-
-# For climate models
-plot(x_train[,1],x_train[,2], 
-     col = ifelse(pw[,1]>0.75,"black",ifelse(pw[,1]>0.5,"darkred",
-                                               ifelse(pw[,1]>0.25,"orange2","yellow"))), pch = 16)
-
-plot(x_train[,1],x_train[,2], 
-     col = ifelse(pw_nn[,1]>0.75,"black",ifelse(pw_nn[,1]>0.5,"darkred",
-                                             ifelse(pw_nn[,1]>0.25,"orange2","yellow"))), pch = 16)
-
-# In terms of y
-xdata = cbind(x1 = x_train,x2 = rep(0,n_train))
-ugrid = seq(0.5,max(x_train)-min(x_train),by = 1)
-#geor_vghat = variog(coords = xdata, data = y_train - rowMeans(f_train), uvec = ugrid)
-geor_vghat = variog(coords = xdata, data = f_train[,3], uvec = ugrid)
-plot(ugrid, geor_vghat$v*2)
-
-
-#-------------------------------------------------
-# Old - Pointwise Weights via regularization for Variogram
-#-------------------------------------------------
-tau2 = (1/(2*1))^2
-h_grid = seq(0.1,16,by = 0.1)
-
-wt_ptw = matrix(0,nrow = n_train,ncol = 3)
-for(i in 1:n_train){
-  wt_ptw[i,] = t(solve((f_train[i,]%*%t(f_train[i,]))/sig2_hat + 
-                         1/tau2*diag(3))%*%(f_train[i,]*y_train[i]/sig2_hat + rep(0.5,3)/tau2))   
-}
-
-# Plot the pointwise weights
-plot(x_train,wt_ptw[,1], col = 'red', pch = 16)
-points(x_train,wt_ptw[,2], col = 'blue', pch = 16)
-points(x_train,wt_ptw[,3], col = 'green3', pch = 16)
-
-
-# Plot the empirical variogram for w1
-xdata = cbind(x1 = x_train,x2 = rep(0,n_train))
-vghat = c() 
-for(j in 1:K){
-  geor_vghat = variog(coords = xdata, data = wt_ptw[,j],uvec = h_grid)
-  vgh = 2*geor_vghat$v
-  vghat = cbind(vghat,vgh)
-}
-
-colnames(vghat) = paste0("vw",1:K)
-
-# Plot the empirical variogram for the mean weight
-vghat_mean = rowMeans(vghat)
-plot(geor_vghat$u,vghat_mean)
-
-# Save results
-out = list(vghat = vghat, hgrid = geor_vghat$u, what = wt_ptw, x = x_train,y = y_train)
-saveRDS(out, paste0(filedir,"pwtrig3_emp_variogram_wt_10_30_23.rds"))
-
-
 #-------------------------------------------------
 # Batch Fit
 #-------------------------------------------------
@@ -373,7 +317,7 @@ fit=train.openbtmixing(x_train,y_train,f_train,pbd=c(1.0,0),ntree = 10,ntreeh=1,
 
 #Get mixed mean function
 fitp=predict.openbtmixing(fit,x.test = x_test, f.test = f_test,tc=4, q.lower = 0.025, q.upper = 0.975,
-                          ptype = "mean", proj_type = "softmax", temperature = 0.2)
+                          ptype = "mean_and_proj", proj_type = "euclidean", temperature = 0.8)
 
 # Sum of the weights
 K= ncol(f_train)
@@ -385,7 +329,7 @@ wsum_mean = apply(wsum,2,mean)
 wsum_lb = apply(wsum,2,quantile, 0.025)
 wsum_ub = apply(wsum,2,quantile, 0.975)
 
-
+# Predictions
 plot(x_test, f0_test, pch = 16, cex = 0.8, main = 'Fits', type = 'l',ylim = c(-15,15))
 points(x_train, y_train, pch = 3)
 lines(x_test, f_test[,1], col = 'red', lty = 2)
@@ -424,7 +368,7 @@ lines(x_test, fitp$pm.lower, col = 'orange', lwd = 2, cex = 0.5)
 lines(x_test, fitp$pm.upper, col = 'orange', lwd = 2, cex = 0.5)
 
 #Plot model weights
-plot(x_test, fitp$pw.5[,1], pch = 16, col = 'red', type = 'l', ylim = c(-1,2.0), lwd = 2, 
+plot(x_test, fitp$pwmean[,1], pch = 16, col = 'red', type = 'l', ylim = c(-1,2.0), lwd = 2, 
      panel.first = {grid(col = 'lightgrey')})
 lines(x_test, fitp$pw.5[,2], col = 'blue', lwd = 2)
 lines(x_test, fitp$pw.5[,3], col = 'green3', lwd = 2)

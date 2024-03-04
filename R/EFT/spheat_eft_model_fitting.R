@@ -280,34 +280,43 @@ saveRDS(ms, paste0(filedir,"ms_n20_01_23_24.rds"))
 saveRDS(fit_sg, paste0(filedir,"fsg_fit_n4_01_23_24.rds"))
 saveRDS(fit_lg, paste0(filedir,"flg_fit_n4_01_23_24.rds"))
 
+
 #------------------------------------------------
-# Code Example
+# Generate other model sets
 #------------------------------------------------
-sqr_exp_wrapper = function(x1,x2,params,sig2 = FALSE){
-  Rx = apply(cbind(x1,x2), 1, function(x) sqr_exp_kernel(x[1],x[2],params[1],params[2]))
-  return(Rx)
+L_list = c(2,5,8)
+fdag_list = list()
+fexp_list = list()
+exp_order = list(c(5,10),c(10,9),c(10,10)) 
+lg_center = c(4.5,5,4)
+
+n_test = 200
+g_test = seq(0.01,5, length = 200)
+x_test = 0.5*log(g_test+1)
+for(i in 1:length(L_list)){
+  L = L_list[i]
+  fsg_grid = heat_sg_exp(g_test,exp_order[[i]][1],L)
+  flg_grid = heat_lg_exp(g_test,exp_order[[i]][2],L, center = lg_center[i])
+  
+  f0_test = sapply(x_test,function(x) d2_logz(x,L,0.1)/L^2)
+  fdag_list[[i]] = f0_test
+  fexp_list[[i]] = cbind(fsg = fsg_grid, flg = flg_grid)
 }
 
-hplist = list(c(3,0.5),c(5,5))
-mhp = c(1,1)
 
-x = seq(1,5,length = 10)
-xg = seq(1,5,length = 25)
-y = x^2
-y = y - mean(y)
+plot(g_test, fdag_list[[3]], ylim = c(0,10))
+lines(g_test, fexp_list[[3]][,1], col = 'red')
+lines(g_test, fexp_list[[3]][,2], col = 'blue')
 
-fit = gp_train(y, x, cov_function = sqr_exp_wrapper, 
-               priornames = c("invgamma","invgamma"), hp = hplist, 
-               mh_proposal = mhp, nd = 2000, nadapt = 2000, nburn = 1000, 
-               adaptevery = 500, nug = 1e-6)
+msets = list(
+  fdag_list = fdag_list,
+  fexp_list = fexp_list,
+  lg_center = lg_center,
+  g_test = g_test,
+  L_list = L_list,
+  exp_order = exp_order
+)
 
+filedir = "/home/johnyannotty/Documents/Dissertation/results/EFT/spheat_model_fit/"
+saveRDS(msets, paste0(filedir,"sh_model_sets.rds"))
 
-plot(fit$post[,1])
-plot(fit$post[,2])
-
-m1 = rep(0,10)
-m2 = rep(0,25)
-pred = gp_predict(fit,y,x,xg,m1,m2,cov_function = sqr_exp_wrapper)
-
-plot(xg,xg^2)
-lines(xg,pred$pred_mean + mean(x^2))

@@ -20,11 +20,12 @@ f_test = cbind(fsg = ms$fsg_test, flg = ms$flg_test)
 nu = 30
 rho = 1
 sig2_hat = max(apply(apply(f_train, 2, function(x) (x-ms$y_train)^2),2,min))
+q0 = 4
 
 fit=train.openbtmixing(ms$g_train,ms$y_train,f_train,pbd=c(1.0,0),ntree = 10,ntreeh=1,numcut=100,tc=2,model="mixbart",modelname="physics_model",
                        ndpost = 10000, nskip = 2000, nadapt = 5000, adaptevery = 500, printevery = 500,
                        power = 2.0, base = 0.95, minnumbot = 2, overallsd = sqrt(sig2_hat), k = 1.0, overallnu = nu,
-                       summarystats = FALSE, rpath = TRUE, q = q0, rshp1 = 4, rshp2 = 20,
+                       summarystats = FALSE, rpath = FALSE, q = q0, rshp1 = 4, rshp2 = 20,
                        stepwpert = 0.1, probchv = 0.1, batchsize = 1000)
 
 
@@ -33,22 +34,22 @@ fitp=predict.openbtmixing(fit,x.test = ms$g_test, f.test = f_test,
                           tc=4, q.lower = 0.025, q.upper = 0.975,
                           ptype = "all", proj_type = "euclidean")
 
-plot(g_test, f0_test, pch = 16, cex = 0.8, main = 'Fits', type = 'l',ylim = c(-2,7))
-points(g_train, y_train, pch = 3)
-lines(g_test, f_test[,1], col = 'red', lty = 2)
-lines(g_test, f_test[,2], col = 'blue', lty = 2)
-lines(g_test, fitp$mmean, col = 'purple', lwd = 2)
-lines(g_test, fitp$m.lower, col = 'purple', lwd = 2, cex = 0.5, lty = 'dashed')
-lines(g_test, fitp$m.upper, col = 'purple', lwd = 2, cex = 0.5, lty = 'dashed')
+plot(ms$g_test, ms$f0_test, pch = 16, cex = 0.8, main = 'Fits', type = 'l',ylim = c(-2,7))
+points(ms$g_train, ms$y_train, pch = 3)
+lines(ms$g_test, f_test[,1], col = 'red', lty = 2)
+lines(ms$g_test, f_test[,2], col = 'blue', lty = 2)
+lines(ms$g_test, fitp$mmean, col = 'purple', lwd = 2)
+lines(ms$g_test, fitp$m.lower, col = 'purple', lwd = 2, cex = 0.5, lty = 'dashed')
+lines(ms$g_test, fitp$m.upper, col = 'purple', lwd = 2, cex = 0.5, lty = 'dashed')
 
 #Plot model weights
-plot(g_test, fitp$wmean[,1], pch = 16, col = 'red', type = 'l', ylim = c(-0.2,1.2), lwd = 2, 
+plot(ms$g_test, fitp$wmean[,1], pch = 16, col = 'red', type = 'l', ylim = c(-0.2,1.2), lwd = 2, 
      panel.first = {grid(col = 'lightgrey')})
-lines(g_test, fitp$wmean[,2], col = 'blue', lwd = 2)
-lines(g_test, fitp$w.upper[,1], col = 'red', lty = 'dashed', lwd = 1)
-lines(g_test, fitp$w.lower[,1], col = 'red', lty = 'dashed', lwd = 1)
-lines(g_test, fitp$w.upper[,2], col = 'blue', lty = 'dashed', lwd = 1)
-lines(g_test, fitp$w.lower[,2], col = 'blue', lty = 'dashed', lwd = 1)
+lines(ms$g_test, fitp$wmean[,2], col = 'blue', lwd = 2)
+lines(ms$g_test, fitp$w.upper[,1], col = 'red', lty = 'dashed', lwd = 1)
+lines(ms$g_test, fitp$w.lower[,1], col = 'red', lty = 'dashed', lwd = 1)
+lines(ms$g_test, fitp$w.upper[,2], col = 'blue', lty = 'dashed', lwd = 1)
+lines(ms$g_test, fitp$w.lower[,2], col = 'blue', lty = 'dashed', lwd = 1)
 
 # Get wsum
 wsum = 0*fitp$wdraws[[1]]
@@ -60,31 +61,30 @@ wsum_lb = apply(wsum,2,quantile, 0.025)
 wsum_ub = apply(wsum,2,quantile, 0.975)
 
 #Get projected mixed mean function
-plot(x_test, f0_test, pch = 16, cex = 0.8, main = 'Fits', type = 'l',ylim = c(-15,15))
-points(x_train, y_train, pch = 3)
-lines(x_test, f_test[,1], col = 'red', lty = 2)
-lines(x_test, f_test[,2], col = 'blue', lty = 2)
-lines(x_test, fitp$pmmean, col = 'purple', lwd = 2)
-lines(x_test, fitp$pm.lower, col = 'orange', lwd = 2, cex = 0.5)
-lines(x_test, fitp$pm.upper, col = 'orange', lwd = 2, cex = 0.5)
+plot(ms$g_test, ms$f0_test, pch = 16, cex = 0.8, main = 'Fits', type = 'l',ylim = c(-15,15))
+points(ms$g_train, ms$y_train, pch = 3)
+lines(ms$g_test, f_test[,1], col = 'red', lty = 2)
+lines(ms$g_test, f_test[,2], col = 'blue', lty = 2)
+lines(ms$g_test, fitp$pmmean, col = 'purple', lwd = 2)
+lines(ms$g_test, fitp$pm.lower, col = 'orange', lwd = 2, cex = 0.5)
+lines(ms$g_test, fitp$pm.upper, col = 'orange', lwd = 2, cex = 0.5)
 
 #Plot Projected model weights
-plot(x_test, fitp$pwmean[,1], pch = 16, col = 'red', type = 'l', ylim = c(-1,2.0), lwd = 2, 
+plot(ms$g_test, fitp$pwmean[,1], pch = 16, col = 'red', type = 'l', ylim = c(-1,2.0), lwd = 2, 
      panel.first = {grid(col = 'lightgrey')})
-lines(x_test, fitp$pwmean[,2], col = 'blue', lwd = 2)
-lines(x_test, fitp$pw.upper[,1], col = 'red', lty = 'dashed', lwd = 1)
-lines(x_test, fitp$pw.lower[,1], col = 'red', lty = 'dashed', lwd = 1)
-lines(x_test, fitp$pw.upper[,2], col = 'blue', lty = 'dashed', lwd = 1)
-lines(x_test, fitp$pw.lower[,2], col = 'blue', lty = 'dashed', lwd = 1)
+lines(ms$g_test, fitp$pwmean[,2], col = 'blue', lwd = 2)
+lines(ms$g_test, fitp$pw.upper[,1], col = 'red', lty = 'dashed', lwd = 1)
+lines(ms$g_test, fitp$pw.lower[,1], col = 'red', lty = 'dashed', lwd = 1)
+lines(ms$g_test, fitp$pw.upper[,2], col = 'blue', lty = 'dashed', lwd = 1)
+lines(ms$g_test, fitp$pw.lower[,2], col = 'blue', lty = 'dashed', lwd = 1)
 
 #Get estimated delta
-plot(x_test, f0_test, pch = 16, cex = 0.8, main = 'Fits', type = 'l',ylim = c(-2,2))
-points(x_train, y_train, pch = 3)
-lines(x_test, f_test[,1], col = 'red', lty = 2)
-lines(x_test, f_test[,2], col = 'blue', lty = 2)
-lines(x_test, fitp$dmean, col = 'purple', lwd = 2)
-lines(x_test, fitp$d.upper, col = 'orange', lwd = 2, cex = 0.5)
-lines(x_test, fitp$d.lower, col = 'orange', lwd = 2, cex = 0.5)
+plot(ms$g_test, ms$f0_test, pch = 16, cex = 0.8, main = 'Fits', type = 'l',ylim = c(-2,2))
+lines(ms$g_test, f_test[,1], col = 'red', lty = 2)
+lines(ms$g_test, f_test[,2], col = 'blue', lty = 2)
+lines(ms$g_test, fitp$dmean, col = 'purple', lwd = 2)
+lines(ms$g_test, fitp$d.upper, col = 'orange', lwd = 2, cex = 0.5)
+lines(ms$g_test, fitp$d.lower, col = 'orange', lwd = 2, cex = 0.5)
 
 
 #------------------------------------------------
@@ -97,8 +97,8 @@ softmax_l2 = function(tmp){
   return(list(Score = score, Pred = 0))
 } 
 
-tmp_bounds = list(tmp = c(0,1))
-init_grid_dt = data.frame(tmp = seq(0.01,0.95, length = 10))
+tmp_bounds = list(tmp = c(0.01,1))
+init_grid_dt = data.frame(tmp = seq(0.015,0.95, length = 10))
 bayes_temp = BayesianOptimization(FUN = softmax_l2, acq = "ei",
                                   bounds = tmp_bounds, init_grid_dt = init_grid_dt,
                                   init_points = 0.8, n_iter = 10)
@@ -115,31 +115,30 @@ fitp_sm=predict.openbtmixing(fit,x.test = ms$g_test, f.test = f_test,
 
 
 #Get projected mixed mean function
-plot(x_test, f0_test, pch = 16, cex = 0.8, main = 'Fits', type = 'l',ylim = c(-15,15))
-points(x_train, y_train, pch = 3)
-lines(x_test, f_test[,1], col = 'red', lty = 2)
-lines(x_test, f_test[,2], col = 'blue', lty = 2)
-lines(x_test, fitp_sm$pmmean, col = 'purple', lwd = 2)
-lines(x_test, fitp_sm$pm.lower, col = 'orange', lwd = 2, cex = 0.5)
-lines(x_test, fitp_sm$pm.upper, col = 'orange', lwd = 2, cex = 0.5)
+plot(ms$g_test, ms$f0_test, pch = 16, cex = 0.8, main = 'Fits', type = 'l',ylim = c(-15,15))
+points(ms$g_train, ms$y_train, pch = 3)
+lines(ms$g_test, f_test[,1], col = 'red', lty = 2)
+lines(ms$g_test, f_test[,2], col = 'blue', lty = 2)
+lines(ms$g_test, fitp_sm$pmmean, col = 'purple', lwd = 2)
+lines(ms$g_test, fitp_sm$pm.lower, col = 'orange', lwd = 2, cex = 0.5)
+lines(ms$g_test, fitp_sm$pm.upper, col = 'orange', lwd = 2, cex = 0.5)
 
 #Plot Projected model weights
-plot(x_test, fitp_sm$pwmean[,1], pch = 16, col = 'red', type = 'l', ylim = c(-1,2.0), lwd = 2, 
+plot(ms$g_test, fitp_sm$pwmean[,1], pch = 16, col = 'red', type = 'l', ylim = c(-1,2.0), lwd = 2, 
      panel.first = {grid(col = 'lightgrey')})
-lines(x_test, fitp_sm$pwmean[,2], col = 'blue', lwd = 2)
-lines(x_test, fitp_sm$pw.upper[,1], col = 'red', lty = 'dashed', lwd = 1)
-lines(x_test, fitp_sm$pw.lower[,1], col = 'red', lty = 'dashed', lwd = 1)
-lines(x_test, fitp_sm$pw.upper[,2], col = 'blue', lty = 'dashed', lwd = 1)
-lines(x_test, fitp_sm$pw.lower[,2], col = 'blue', lty = 'dashed', lwd = 1)
+lines(ms$g_test, fitp_sm$pwmean[,2], col = 'blue', lwd = 2)
+lines(ms$g_test, fitp_sm$pw.upper[,1], col = 'red', lty = 'dashed', lwd = 1)
+lines(ms$g_test, fitp_sm$pw.lower[,1], col = 'red', lty = 'dashed', lwd = 1)
+lines(ms$g_test, fitp_sm$pw.upper[,2], col = 'blue', lty = 'dashed', lwd = 1)
+lines(ms$g_test, fitp_sm$pw.lower[,2], col = 'blue', lty = 'dashed', lwd = 1)
 
 #Get estimated delta
-plot(x_test, f0_test, pch = 16, cex = 0.8, main = 'Fits', type = 'l',ylim = c(-2,2))
-points(x_train, y_train, pch = 3)
-lines(x_test, f_test[,1], col = 'red', lty = 2)
-lines(x_test, f_test[,2], col = 'blue', lty = 2)
-lines(x_test, fitp_sm$dmean, col = 'purple', lwd = 2)
-lines(x_test, fitp_sm$d.upper, col = 'orange', lwd = 2, cex = 0.5)
-lines(x_test, fitp_sm$d.lower, col = 'orange', lwd = 2, cex = 0.5)
+plot(ms$g_test, ms$f0_test, pch = 16, cex = 0.8, main = 'Fits', type = 'l',ylim = c(-2,2))
+lines(ms$g_test, f_test[,1], col = 'red', lty = 2)
+lines(ms$g_test, f_test[,2], col = 'blue', lty = 2)
+lines(ms$g_test, fitp_sm$dmean, col = 'purple', lwd = 2)
+lines(ms$g_test, fitp_sm$d.upper, col = 'orange', lwd = 2, cex = 0.5)
+lines(ms$g_test, fitp_sm$d.lower, col = 'orange', lwd = 2, cex = 0.5)
 
 
 
@@ -199,6 +198,6 @@ softmax_res = list(
 )
 
 filedir = "/home/johnyannotty/Documents/Dissertation/results/EFT/spheat_model_fit/"
-saveRDS(fit_data, paste0(filedir,"bmm_res_01_23_24.rds"))
-saveRDS(wts_l2_proj, paste0(filedir,"bmm_wl2_proj_01_23_24.rds"))
-saveRDS(softmax_res, paste0(filedir,"bmm_softmax_proj_01_23_24.rds"))
+saveRDS(fit_data, paste0(filedir,"bmm_dpath_res_02_05_24.rds"))
+saveRDS(wts_l2_proj, paste0(filedir,"bmm_dpath_wl2_proj_02_05_24.rds"))
+saveRDS(softmax_res, paste0(filedir,"bmm_dpath_softmax_proj_02_05_24.rds"))

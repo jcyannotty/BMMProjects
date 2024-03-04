@@ -312,5 +312,18 @@ if(fname %in% xx){
 }
 
 
-#setwd("/home/johnyannotty/Documents/openbt/src")
-#system("make")
+#------------------------------------------------
+# Write csv's - used for python
+#------------------------------------------------
+#csvfold = paste0(sn,"_",desc,"_",dt,"_n",sum(n_train),"_csvs")
+csvfold = "ACC_BCC_MIROC_CMCC_CESM2_CNRM_CanESM5_KIOST_W_3M_2014_01_26_24_n45000_csvs/"
+write.csv(out_data$f_train, paste0(filedir,ffold,csvfold,"f_train.csv"), row.names = FALSE)
+write.csv(out_data$y_train, paste0(filedir,ffold,csvfold,"y_train.csv"), row.names = FALSE)
+write.csv(out_data$x_train, paste0(filedir,ffold,csvfold,"x_train.csv"), row.names = FALSE)
+write.csv(out_data$f_test, paste0(filedir,ffold,csvfold,"f_test.csv"), row.names = FALSE)
+write.csv(out_data$y_test, paste0(filedir,ffold,csvfold,"y_test.csv"), row.names = FALSE)
+write.csv(out_data$x_test, paste0(filedir,ffold,csvfold,"x_test.csv"), row.names = FALSE)
+
+
+
+

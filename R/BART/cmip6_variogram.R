@@ -9,12 +9,17 @@ library(plotly)
 library(viridis)
 library(latex2exp)
 library(colorRamps)
+library(geoR)
+
+setwd("/home/johnyannotty/Documents/openbt/src")
 
 source("/home/johnyannotty/Documents/openbt/src/openbt.R")
 source("/home/johnyannotty/Documents/openbt/src/openbt_mixing.R")
 source("/home/johnyannotty/Documents/BayesToolBox/bayestb/GaussianProcesses/kernels.R")
 source("/home/johnyannotty/Documents/BayesToolBox/bayestb/Plotting/computer_expt_plots.R")
 source("/home/johnyannotty/Documents/BayesToolBox/bayestb/GaussianProcesses/gp_utils.R")
+
+library(rBayesianOptimization)
 
 #------------------------------------------------
 # Read in Data
@@ -74,6 +79,122 @@ out = list(vg = vg_out, xbnds = xbnds, h = hgrid, pgrid = param_grid,
            sigma2 = 1,dataref = paste0(filedir,datadir,dataname),
            vgyhat = 2*vgyhat$v, vgyhat_uvec = vgyhat$u)
 saveRDS(out, paste0(filedir,"Variograms/vgb_nwh_n2500.rds"))
+
+
+#------------------------------------------------
+# Roptim for Vg
+#------------------------------------------------
+# Define the vg loss
+bayes_vg_loss = function(k,a1,a2,lam){
+  #k = pvec[1]*(ubnds[1] - lbnds[1]) + lbnds[1]
+  #a1 = pvec[2]*(ubnds[2] - lbnds[2]) + lbnds[2]
+  #a2 = pvec[3]*(ubnds[3] - lbnds[3]) + lbnds[3]
+  #pwr = pvec[4]*(ubnds[4] - lbnds[4]) + lbnds[4]
+  #lam = pvec[5]*(ubnds[5] - lbnds[5]) + lbnds[5]
+  
+  k = k*(ubnds[1] - lbnds[1]) + lbnds[1]
+  a1 = a1*(ubnds[2] - lbnds[2]) + lbnds[2]
+  a2 = a2*(ubnds[3] - lbnds[3]) + lbnds[3]
+  pwr = 1
+  #pwr = pwr*(ubnds[4] - lbnds[4]) + lbnds[4]
+  lam = lam*(ubnds[5] - lbnds[5]) + lbnds[5]
+  sig2 = nu*(lam)/(nu + 2)
+  
+  vg = variogram.openbtmixing(xbnds,hgrid,N,1,
+                              k=k,
+                              0.95,
+                              power = pwr,
+                              a1 = a1,
+                              a2 = a2,
+                              4,
+                              ncut = 1000,
+                              beta = 0,
+                              sigma2 = sig2,
+                              maxd = 999,
+                              type = "b",
+                              ymin = ymin,
+                              ymax = ymax
+  )
+  score = mean((vg$vmean/2-emp_vg)^2) 
+  return(list(Score = score, Pred = 0))
+}
+
+
+vg_loss = function(pvec){
+  k = pvec[1]*(ubnds[1] - lbnds[1]) + lbnds[1]
+  a1 = pvec[2]*(ubnds[2] - lbnds[2]) + lbnds[2]
+  a2 = pvec[3]*(ubnds[3] - lbnds[3]) + lbnds[3]
+  #pwr = pvec[4]*(ubnds[4] - lbnds[4]) + lbnds[4]
+  lam = pvec[4]*(ubnds[4] - lbnds[4]) + lbnds[4]
+  pwr = 1
+  sig2 = nu*(lam)/(nu + 2)
+  
+  vg = variogram.openbtmixing(xbnds,hgrid,N,1,
+                              k=k,
+                              0.95,
+                              power = pwr,
+                              a1 = a1,
+                              a2 = a2,
+                              4,
+                              ncut = 1000,
+                              beta = 0,
+                              sigma2 = sig2,
+                              maxd = 999,
+                              type = "b",
+                              ymin = ymin,
+                              ymax = ymax
+  )
+  score = mean((vg$vmean/2-emp_vg)^2) 
+  return(score)
+}
+
+
+# Global options
+nu = 3
+xbnds = t(apply(ms$x_test,2,range))
+xbnds = xbnds[-3,]
+hgrid = seq(0.5,20,by = 0.75)
+N = 10000
+ymin = min(y_train)
+ymax = max(y_train)
+lbnds = c(0.5,2,2,0.1)
+ubnds = c(4,10,40,2)
+
+# Empirical
+vgyhat = variog(coords = x_train, data = y_train, uvec = hgrid)
+emp_vg = vgyhat$v[-1]
+plot(vgyhat$u,vgyhat$v)
+
+# Test the loss
+#pvec0 = c(1.5,2,10,2,1)
+pvec0 = rep(0.5,4)
+vg_loss(pvec0)
+
+
+# Run Optim
+vgoptim = optim(pvec0, vg_loss, upper = rep(1,4), method = "L-BFGS-B",
+                lower = rep(0,4), control = list(maxit = 50))
+vgoptim$par
+res = 0 
+for(j in 1:4){
+  res[j] = vgoptim$par[j]*(ubnds[j]-lbnds[j])+lbnds[j] 
+}
+
+
+# Do bayes opt
+par_bounds = list(k = c(0,1),a1 = c(0,1),a2 = c(0,1),
+                  #pwr = c(0,1),
+                  lam = c(0,1))
+init_grid_dt = data.frame(k = seq(0.1,0.9, length = 10),
+                          a1 = seq(0.1,0.9, length = 10),
+                          a2 = seq(0.1,0.9, length = 10),
+                          #pwr = seq(0.1,0.9, length = 10),
+                          lam = seq(0.1,0.9, length = 10))
+bayes_temp = BayesianOptimization(FUN = vg_loss, acq = "ei",
+                                  bounds = par_bounds, init_grid_dt = init_grid_dt,
+                                  init_points = pvec0, n_iter = 30)
+
+tmp = bayes_temp$Best_Par # from bayes opt
 
 
 

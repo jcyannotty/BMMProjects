@@ -23,7 +23,7 @@ filedir = '/home/johnyannotty/Documents/RandomPathBART/VariogramResults/2d_funct
 #-----------------------------------------------------
 set.seed(2)
 n_train = 80 
-n_test = 50
+n_test = 25
 xoff = 0.10
 xmin = -pi
 xmax = pi
@@ -156,6 +156,18 @@ fit_data = list(
 
 saveRDS(fit_data, paste0(filedir,"taylor_sincos2_results3_10_30_23.rds"))
 
+ms = list(
+  y_train = y_train,
+  x_train = x_train,
+  x_test = x_test,
+  f_train = f_train,
+  f_test = f_test,
+  f0_test = f0_test,
+  s = s
+)
+
+filedir = '/home/johnyannotty/Documents/Dissertation/results/2d_functions/'
+saveRDS(ms, paste0(filedir,"ms_taylor_sincos.rds"))
 
 #-----------------------------------------------------
 # Precision Weights Empirical Variogram
