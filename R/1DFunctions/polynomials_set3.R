@@ -80,7 +80,7 @@ q0 = 4
 fit=openbt(x_train,y_train,f_train,pbd=c(1.0,0),ntree = 10,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="physics_model",
            ndpost = 10000, nskip = 2000, nadapt = 4000, adaptevery = 500, printevery = 500,
            power = 2.0, base = 0.95, minnumbot = 2, overallsd = sqrt(sig2_hat), k = 1, overallnu = nu,
-           summarystats = FALSE, selectp = FALSE, rpath = TRUE, q = q0, rshp1 = 2, rshp2 = 10,
+           summarystats = FALSE, selectp = FALSE, rpath = TRUE, q = q0, rshp1 = 2, rshp2 = 5,
            stepwpert = 0.1, probchv = 0.1)
 
 #Get mixed mean function
@@ -306,11 +306,13 @@ sig2_hat = max(apply(apply(f_train, 2, function(x) (x-y_train)^2),2,min))
 lam = rho*sig2_hat*(nu+2)/nu
 q0 = 4
 
+#f_train = matrix(rep(1,n_train), ncol = 1)
+#f_test = matrix(rep(1,n_test), ncol = 1)
 fit=train.openbtmixing(x_train,y_train,f_train,pbd=c(1.0,0),ntree = 10,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="physics_model",
                        ndpost = 10000, nskip = 2000, nadapt = 5000, adaptevery = 500, printevery = 500,
-                       power = 1.0, base = 0.95, minnumbot = 3, overallsd = sqrt(sig2_hat), k = 1, overallnu = nu,
+                       power = 1.0, base = 0.95, minnumbot = 2, overallsd = sqrt(sig2_hat), k = 1.5, overallnu = nu,
                        summarystats = FALSE, rpath = TRUE, q = q0, rshp1 = 2, rshp2 = 10,
-                       stepwpert = 0.1, probchv = 0.1, batchsize = 1000)
+                       stepwpert = 0.1, probchv = 0.1, batchsize = 100)
 
 #openbt.save(fit,fname = "/home/johnyannotty/Documents/temp_res.obt")
 
@@ -318,6 +320,16 @@ fit=train.openbtmixing(x_train,y_train,f_train,pbd=c(1.0,0),ntree = 10,ntreeh=1,
 #Get mixed mean function
 fitp=predict.openbtmixing(fit,x.test = x_test, f.test = f_test,tc=4, q.lower = 0.025, q.upper = 0.975,
                           ptype = "mean_and_proj", proj_type = "euclidean", temperature = 0.8)
+
+max(abs(fitp$mmean - rowSums(fitp$wmean*f_test)))
+ind = 8452
+max(abs(fitp$mdraws[ind,] - (fitp$wdraws[[1]][ind,]*f_test[,1]+fitp$wdraws[[2]][ind,]*f_test[,2]+
+                             fitp$wdraws[[3]][ind,]*f_test[,3])))
+
+
+max(abs(fitp$pmdraws[ind,] - (fitp$pwdraws[[1]][ind,]*f_test[,1]+fitp$pwdraws[[2]][ind,]*f_test[,2]+
+                               fitp$pwdraws[[3]][ind,]*f_test[,3])))
+
 
 # Sum of the weights
 K= ncol(f_train)

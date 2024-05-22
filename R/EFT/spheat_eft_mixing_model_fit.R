@@ -22,11 +22,11 @@ rho = 1
 sig2_hat = max(apply(apply(f_train, 2, function(x) (x-ms$y_train)^2),2,min))
 q0 = 4
 
-fit=train.openbtmixing(ms$g_train,ms$y_train,f_train,pbd=c(1.0,0),ntree = 10,ntreeh=1,numcut=100,tc=2,model="mixbart",modelname="physics_model",
+fit=train.openbtmixing(ms$g_train,ms$y_train,f_train,pbd=c(1.0,0),ntree = 10,ntreeh=1,numcut=100,tc=4,model="mixbart",modelname="physics_model",
                        ndpost = 10000, nskip = 2000, nadapt = 5000, adaptevery = 500, printevery = 500,
-                       power = 2.0, base = 0.95, minnumbot = 2, overallsd = sqrt(sig2_hat), k = 1.0, overallnu = nu,
-                       summarystats = FALSE, rpath = FALSE, q = q0, rshp1 = 4, rshp2 = 20,
-                       stepwpert = 0.1, probchv = 0.1, batchsize = 1000)
+                       power = 2.0, base = 0.95, minnumbot = 2, overallsd = sqrt(sig2_hat), k = 1.5, overallnu = nu,
+                       summarystats = FALSE, rpath = TRUE, q = q0, rshp1 = 2, rshp2 = 20,
+                       stepwpert = 0.1, probchv = 0.1, batchsize = 10000)
 
 
 #Get mixed mean function
@@ -86,6 +86,9 @@ lines(ms$g_test, fitp$dmean, col = 'purple', lwd = 2)
 lines(ms$g_test, fitp$d.upper, col = 'orange', lwd = 2, cex = 0.5)
 lines(ms$g_test, fitp$d.lower, col = 'orange', lwd = 2, cex = 0.5)
 
+
+# Checker:
+max(abs(unlist(fitp$mmean) - rowSums(fitp$wmean*f_test)))
 
 #------------------------------------------------
 # Manual Softmax projection
@@ -198,6 +201,6 @@ softmax_res = list(
 )
 
 filedir = "/home/johnyannotty/Documents/Dissertation/results/EFT/spheat_model_fit/"
-saveRDS(fit_data, paste0(filedir,"bmm_dpath_res_02_05_24.rds"))
+saveRDS(fit_data, paste0(filedir,"bmm_rpath_res_03_18_24.rds"))
 saveRDS(wts_l2_proj, paste0(filedir,"bmm_dpath_wl2_proj_02_05_24.rds"))
 saveRDS(softmax_res, paste0(filedir,"bmm_dpath_softmax_proj_02_05_24.rds"))

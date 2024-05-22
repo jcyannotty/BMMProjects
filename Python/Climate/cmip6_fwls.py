@@ -9,9 +9,11 @@ import numpy as np
 import torch
 import pickle
 import matplotlib.pyplot as plt
+import itertools
+from sklearn.model_selection import ShuffleSplit
+from tqdm import tqdm
+
 import importlib
-
-
 #import nns
 #importlib.reload(nns)
 
@@ -46,9 +48,13 @@ class FWLSNN(NNS):
 # Data load
 #-----------------------------------------------------
 filedir = "/home/johnyannotty/Documents/CMIP6_mixing/"
-datadir = "Data/World/"
-resdir = "Results/World/"
-dataname = "ACC_BCC_MIROC_CMCC_CESM2_CNRM_CanESM5_KIOST_W_3M_2014_01_26_24_n45000" 
+#datadir = "Data/World/"
+#resdir = "Results/World/"
+#dataname = "ACC_BCC_MIROC_CMCC_CESM2_CNRM_CanESM5_KIOST_W_3M_2014_01_26_24_n45000" 
+
+datadir = "Data/North_Hemisphere/"
+resdir = "Results/North_Hemisphere/"
+dataname = "ACC_BCC_CESM2_CNRM_NH_6M14_n30000" 
 csvdir = dataname+"_csvs/"
 
 f_train = pd.read_csv(filedir+datadir+csvdir+"f_train.csv").values
@@ -66,21 +72,63 @@ sn = csvdir.split("_")[0:K]
 f_train = f_train.reshape(n_train,1,K)
 f_test = f_test.reshape(n_test,1,K)
 
+
 #-----------------------------------------------------
-# Model Fit
+# Get Validation set
 #-----------------------------------------------------
+Nval = int(np.round(n_train*0.1))
+splitter = ShuffleSplit(n_splits=1,test_size=Nval,random_state=2)
+index_train, index_val = next(iter(splitter.split(x_train,y_train)))
+
+x_val = x_train[index_val]
+y_val = y_train[index_val]
+f_val = f_train[index_val]
+
+nnx_train = x_train[index_train]
+nny_train = y_train[index_train]
+nnpred_train = f_train[index_train]
+
+#-----------------------------------------------------
+# Parameter Exploration
+#-----------------------------------------------------
+pdict = {"nlayers": [3,4,5], "hsz":[150,200,300],"wtd":[0]}
+keys, values = zip(*pdict.items())
+param_grid = [dict(zip(keys, v)) for v in itertools.product(*values)]
+nnval_loss = []
+len(param_grid)
 method = "UNNS"
-nlayers = 3
-hsz = 100
 delta = False
 
+for pg in tqdm(param_grid):
+    nlayers = pg["nlayers"]
+    wtd = pg["wtd"]
+    hsz = pg["hsz"]
+
+    nnsmodel = FWLSNN(ensemble_method = method, nworkers = 4, num_layers = nlayers,
+                hidden_size = hsz, es = True, es_validation_set = 5000, nepoch = 2, gpu = False,
+                ensemble_addition = delta, estimators = sn, nn_weight_decay = wtd)
+
+    nnsmodel.fit(x_train, y_train, predictions = f_train, x_val = x_val, y_val = y_val, f_val = f_val)
+    nnval_loss.append(nnsmodel.best_loss_val)
+
+h = np.where(nnval_loss == min(nnval_loss))[0][0]
+nnval_loss[h]
+param_grid[h]
+
+#-----------------------------------------------------
+# Final Model Fit
+#-----------------------------------------------------
+method = "UNNS"
+delta = False
+nlayers = 4
+hsz = 300
+wtd = 0
+
 nnsmodel = FWLSNN(ensemble_method = method, nworkers = 4, num_layers = nlayers,
-              hidden_size = hsz, es = True, es_validation_set = 5000, nepoch = 2, gpu = False,
-              ensemble_addition = delta, estimators = sn)
+              hidden_size = hsz, es = False, es_validation_set = 0, nepoch = 2000, gpu = False,
+              ensemble_addition = delta, estimators = sn, nn_weight_decay = wtd)
 
-nnsmodel.fit(x_train, y_train, predictions = f_train, x_val = x_test[0:10,:], y_val = y_test[0:10,:], f_val = f_test[0:10,:,:])
-
-
+nnsmodel.fit(x_train, y_train, predictions = f_train)
 
 #nnsmodel.__dict__.keys()
 #nnsmodel.__dict__["best_loss_val"]
@@ -90,6 +138,16 @@ nnsmodel.fit(x_train, y_train, predictions = f_train, x_val = x_test[0:10,:], y_
 nns_pred = nnsmodel.predict_new(x_test, f_test)
 nns_wts = nnsmodel.get_weights(x_test)
 np.sqrt(np.mean((nns_pred - y_test)**2))
+
+h1 = np.where(x_test[:,2]==1)
+h2 = np.where(x_test[:,2]==2)
+h3 = np.where(x_test[:,2]==3)
+h4 = np.where(x_test[:,2]==4)
+h5 = np.where(x_test[:,2]==5)
+h6 = np.where(x_test[:,2]==6)
+
+np.sqrt(np.mean((nns_pred - y_test)**2))
+np.sqrt(np.mean((nns_pred[h6] - y_test[h6])**2))
 
 nit = len(nnsmodel.__dict__["loss_history_validation"])
 nnsmodel.__dict__["loss_history_train"][(nit-5):]
@@ -101,17 +159,25 @@ nnsmodel.__dict__["loss_history_validation"][(nit-5):]
 #-----------------------------------------------------
 out_dict = {}
 out_dict["loss_history_train"] = nnsmodel.__dict__["loss_history_train"]
-out_dict["loss_history_val"] = nnsmodel.__dict__["loss_history_validation"]
+#out_dict["loss_history_val"] = nnsmodel.__dict__["loss_history_validation"]
 out_dict["pred"] = nns_pred
 out_dict["wts"] = nns_wts
 out_dict["sn"] = sn
 out_dict["hp"] = {"nlayers":nlayers,"hsz":hsz, "method":method, "delta":delta}
 
-outfile = filedir + resdir + dataname + "_nnfwls_tp1.pickle"
+outfile = filedir + resdir + dataname + "_nnfwls_tp1_03_05_24.pickle"
 with open(outfile, 'wb') as pickle_file:
     pickle.dump(out_dict,pickle_file)
 
 
+cv_dict = {}
+cv_dict["param_grid"] = param_grid
+cv_dict["val_loss"] = nnval_loss
+cvoutfile = filedir + resdir + dataname + "_nnfwls_cv1_03_05_24.pickle"
+with open(cvoutfile, 'wb') as pickle_file:
+    pickle.dump(out_dict,pickle_file)
+
 
 #A = np.array([[1,2,3],[4,5,6],[7,8,9],[10,11,12]])
 #A.reshape(4,1,3)[1][0][1]
+

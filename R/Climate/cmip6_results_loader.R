@@ -4,6 +4,8 @@
 setwd("/home/johnyannotty/Documents/openbt/src")
 source("/home/johnyannotty/Documents/openbt/src/openbt_mixing.R")
 source("/home/johnyannotty/Documents/openbt/R/eft_mixing_helper_functions.R")
+source("/home/johnyannotty/Documents/BayesToolBox/bayestb/Plotting/computer_expt_plots.R")
+
 
 library(ncdf4)
 library(chron)
@@ -32,7 +34,7 @@ order_fnames = function(fls){
 #------------------------------------------------
 #------------------------------------------------
 filedir = "/home/johnyannotty/Documents/CMIP6_mixing/"
-datadir = "Data/World/"
+datadir = "Data/World/Emulation/"
 resdir = "Results/World/"
 
 dataname = "CESM2_CNRM_SWUSA_GRID_EV_Dec_2014_12_03_23_n3000.rds"
@@ -47,15 +49,15 @@ dataname = "MIROC_CESM2_CNRM_NorthAmerica_EV_Dec_2014_12_06_23_n4000.rds"
 resname = "MIROC_CESM2_CNRM_NorthAmerica_EV_Dec_2014_12_06_23_n4000.rds"
 sname = "MIROC_CESM2_CNRM_NorthAmerica_EV_Dec_2014_sdraws_12_06_23_n4000.rds"
 
-
 #------------------------------------------------
 # Batch Loader
 #------------------------------------------------
-ffold = "na_Dec2014_n4000_proj1/"
-dataname = "CESM2_CNRM_NorthAmerica_EV_Dec_2014_12_05_23_n4000.rds"
+#ffold = "na_Dec2014_n4000_proj1/"
+#dataname = "CESM2_CNRM_NorthAmerica_EV_Dec_2014_12_05_23_n4000.rds"
 
-ffold = "World_JD2010-2014_hp1/"
-dataname = "ACC_BCC_CESM2_CNRM_W_2M_2010-2014_01_22_24_n50000.rds"
+dataname = "MIROC_World_ev_Aug2014_03_10_24.rds"
+ffold = "world_miroc_emulation_aug2014/"
+
 fls = system(paste0("ls ",filedir,resdir,ffold),intern = TRUE)
 fls = order_fnames(fls)
 batch = 0
@@ -94,8 +96,11 @@ for(i in 1:length(fls)){
 }
 
 
-resid = fit$pred_mean - ms$y_test
+resid = fit$pred_mean - ms$f_test[,3]
 sqrt(mean(resid^2))
+
+#ms$y_test = c(ms$y_test,ms$y_train)
+#ms$x_test = rbind(ms$x_test,ms$x_train)
 
 #resid = ms$f_test[,2] - ms$y_test
 
@@ -159,14 +164,48 @@ hist(unlist(sfit))
 plot(unlist(sfit))
 
 # Prediciton
-pbmm = plot_pred_2d_gg2(ms$x_test, fit$pred_mean,title = "BMM", 
-                      scale_vals = c(-45,0,30) #scale_vals = c(-50,0,40)
-                      ) + labs(x = "Longitude", y = "Latitude", 
-                                                          fill = "Values")
+usa = map_data("world",region = "USA")
+world = map_data("world")
+states = map_data("state")
 
-pdag = plot_pred_2d_gg2(ms$x_test, ms$y_test,title = "ERA5", 
-                        scale_vals = c(-45,0,30) ,#scale_vals = c(-50,0,40)
-                      ) + labs(x = "Longitude", y = "Latitude", fill = "Values")
+
+# Convert long to (-180,180) scale
+ntp = 3
+tp_len = nrow(ms$f_test)/ntp
+for(i in 1:ntp){
+  assign(paste0("h",i),(tp_len*(i-1)+1):(tp_len*i))
+}
+hlist = list(h1,h2,h3)
+
+xs_test = ms$x_test
+xs_test[,"lon"] = ifelse(xs_test[,"lon"] > 180,xs_test[,"lon"]-360,xs_test[,"lon"])
+xs_test[,1] = ifelse(xs_test[,1] < 0,xs_test[,1]-0.25,xs_test[,1])
+
+plot_mean2d_map_viridis(xs_test[h1,], fit$pred_mean,xcols = c(1,2), 
+                        viridis_opt = "viridis",
+                        scale_limit = c(-30,40), title = "ERA5",
+                        maps_list = list(data.frame(world),data.frame(states)),
+                        maps_cols = c("grey30","grey30"),
+                        lat_bnds = c(-90,90),
+                        lon_bnds = c(-180,180)
+)
+
+plot_mean2d_map_viridis(xs_test[h2,], ms$f_test[h2,3],xcols = c(1,2), 
+                        viridis_opt = "viridis",
+                        scale_limit = c(-30,40), title = "ERA5",
+                        maps_list = list(data.frame(world),data.frame(states)),
+                        maps_cols = c("grey30","grey30"),
+                        lat_bnds = c(-90,90),
+                        lon_bnds = c(-180,180)
+)
+
+plot_mean2d_map_gradient(xs_test, ms$f_test[h2,3]-fit$pred_mean,xcols = c(1,2), 
+                        scale_vals = c(-5,0,5), title = "ERA5",
+                        maps_list = list(data.frame(world),data.frame(states)),
+                        maps_cols = c("grey30","grey30"),
+                        lat_bnds = c(0,90),
+                        lon_bnds = c(0,180)
+)
 
 
 p2 = plot_pred_2d_gg2(ms$x_test, ms$f_test[,2],title = "Simulator 2", 

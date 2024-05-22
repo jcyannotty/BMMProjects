@@ -16,10 +16,11 @@ library(latex2exp)
 library(geoR)
 
 filedir = "/home/johnyannotty/Documents/CMIP6_mixing/"
-datadir = "Data/World/"
-resdir = "Results/World/"
-ffold = "nh_6month_2014_n30k/"
-#dataname = "CESM2_CNRM_NWH_12M_2012-2014_01_26_24_n72000.rds" #ACC_BCC_CESM2_CNRM_NH_6M14_01_06_24_n30000.rds"
+datadir = "Data/World/" #"Data/North_Hemisphere/"
+resdir = "Results/World/"  #"Results/North_Hemisphere/"
+ffold = "world_3m_2014_n45k_hp1/" #"nh_6month_2014_n30k/"
+
+#dataname = "ACC_BCC_CESM2_CNRM_NH_6M_2014_03_05_24_n30000.rds"
 dataname = "ACC_BCC_MIROC_CMCC_CESM2_CNRM_CanESM5_KIOST_W_3M_2014_01_26_24_n45000.rds"
 
 ms = readRDS(paste0(filedir,datadir,dataname))
@@ -28,11 +29,9 @@ K = ncol(ms$f_train)
 #-------------------------------------------------
 # Theoretical Variogram
 #-------------------------------------------------
-# Theoretical
+# Theoretical, drop time and elevation
 xbnds = t(apply(ms$x_test,2,range))
-#xbnds = matrix(c(xmin,xmax),ncol = 2, byrow = TRUE)
-# drop time
-xbnds = xbnds[-3,]
+xbnds = xbnds[-c(3,4),]
 hgrid = seq(0.5,80,by = 1.5)
 
 # Grid Search
@@ -62,82 +61,12 @@ saveRDS(out, paste0(filedir,"Variograms/wts_nwhem_n30000.rds"))
 
 
 #-------------------------------------------------
-# Precision Weights for Variogram
-#-------------------------------------------------
-# Precision Weight calculation
-pw_se = apply(ms$f_train,2,function(x) (ms$y_train-x)^2)
-pw_denom = rowSums(1/pw_se)
-pw = (1/pw_se)/pw_denom
-#rowSums(pw)
-
-# Get nearest neightbors
-#knn = 2
-#d = abs(outer(ms$x_train,ms$x_train, "-"))
-#d = outer(x_train[,1],x_train[,1], "-")^2 + outer(x_train[,2],x_train[,2], "-")^2
-#nn = t(matrix(apply(d,1,function(x) order(x)[2:(knn+1)]),nrow = knn))
-#pw_nn = 0*pw
-
-#for(i in 1:nrow(ms$x_train)){
-  #ind = c(i,nn[i,])
-  #pw_se_nn = apply(pw_se[ind,],2,sum)
-  #pw_nn[i,] = (1/pw_se_nn)/sum(1/pw_se_nn)
-#}
-
-rowSums(pw_nn)
-plot(pw[,2])
-plot(pw_nn[,1])
-
-xdata = ms$x_train[,c(1,2,4)]
-vghat = c() 
-vghat_nn = c()
-#h_grid = seq(0.9,max(x_train)-min(x_train),by = 1)
-ugrid = seq(0.5,80,by = 1)
-K = ncol(ms$f_train)
-for(j in 1:K){
-  geor_vghat = variog(coords = xdata, data = pw[,j],uvec = ugrid)
-  vgh = 2*geor_vghat$v
-  vghat = cbind(vghat,vgh)
-  
-  #geor_vghat = variog(coords = xdata, data = pw_nn[,j],uvec = ugrid)
-  #vgh = 2*geor_vghat$v
-  #vghat_nn = cbind(vghat_nn,vgh)
-}
-
-colnames(vghat) = paste0("vw",1:K)
-colnames(vghat_nn) = paste0("vw",1:K)
-
-
-# Plot the empirical variogram for the mean weight
-vghat_mean = rowMeans(vghat)
-plot(geor_vghat$u,vghat_mean, ylim = c(0,0.2))
-
-plot(geor_vghat$u,vghat[,3], ylim = c(0,0.2))
-abline(h = 2*var(pw[,3]))
-
-# Save results
-#out = list(vghat = vghat,vghat_nn = vghat_nn,hgrid = geor_vghat$u, 
-#           what = pw, what_nn = pw_nn, x = x_train,y = y_train)
-#saveRDS(out, paste0(filedir,"pwtrig3_emp_variogram_precwts_11_15_23.rds"))
-
-
-
-# For climate models
-ind = 4
-plot(ms$x_train[,1],ms$x_train[,2], 
-     col = ifelse(pw[,ind]>0.75,"black",
-                  ifelse(pw[,ind]>0.5,"darkred",
-                        ifelse(pw[,ind]>0.25,"orange2","yellow"))), pch = 16,cex = 0.5)
-
-#-------------------------------------------------
 # Variogram in terms of y
 #-------------------------------------------------
 # In terms of y
 h = sample(1:nrow(ms$x_train), size = 10000)
-xdata = ms$x_train[h,c(1,2,4)]
+xdata = ms$x_train[h,c(1,2)]
 ugrid = seq(0.5,80,by = 1.5)
-
-#geor_vghat = variog(coords = xdata, data = ms$y_train - rowMeans(ms$f_train), uvec = ugrid)
-#geor_vghat = variog(coords = xdata, data = ms$y_train, uvec = ugrid)
 
 vgf_list = list()
 for(j in 1:K){
@@ -162,20 +91,19 @@ empvg_out = list(u = geor_vghaty$u, evg_y = 2*geor_vghaty$v,
      evg_f = evg_f,
      dataref = paste0(filedir,datadir,dataname))
 
-saveRDS(empvg_out, paste0(filedir,"Variograms/empvg_world_n45000.rds"))
+saveRDS(empvg_out, paste0(filedir,"Variograms/empvg_world_lon_lat_n45000.rds"))
 
 #-------------------------------------------------
 # Variogram in terms of fx
 hgrid = seq(0.5,80,by = 1.5)
-p = 3
-#sqr_exp_kernel(0,rep(10/p,p),1,c(70,20))
+p = ncol(xdata)
 
-sc2 = 265
-nug = 40
-plot(geor_vghaty$u, geor_vghaty$v*2, ylim = c(0,1000), type = 'l', col='black')
-lines(geor_vghaty$u, vgf_list[[8]]$v*2, col='red')
-Rxvec = sapply(hgrid,function(x) sqr_exp_kernel(0,rep(x/sqrt(p)),sqrt(sc2),c(700,700,700)))
-points(hgrid,2*(sc2-Rxvec + nug))
+sc2 = 220
+nug = 38 #60 #65 #75
+ls = 550
+Rxvec = sapply(hgrid,function(x) sqr_exp_kernel(0,rep(x/sqrt(p),p),sqrt(sc2),c(ls,ls)))
+plot(geor_vghaty$u, vgf_list[[8]]$v, ylim = c(0,500), pch = 1, col='black')
+lines(hgrid,(sc2-Rxvec + nug))
 
 plot(Rxvec)
 
@@ -183,11 +111,11 @@ plot(hgrid,200-Rxvec)
 
 # x bounds
 xbnds = t(apply(ms$x_test,2,range))
-xbnds = xbnds[-3,]
+xbnds = xbnds[1:2,]
 #h_grid = seq(0.1,80,by = 0.1)
 xgrid = cbind(runif(10000,xbnds[1,1],xbnds[1,2]),
-              runif(10000,xbnds[2,1],xbnds[2,2]),
-              runif(10000,xbnds[3,1],xbnds[3,2])
+              runif(10000,xbnds[2,1],xbnds[2,2])
+              #runif(10000,xbnds[3,1],xbnds[3,2])
               )
 
 # Grid Search
@@ -247,31 +175,21 @@ abline(h = 2*var(ms$f_train[,1]))
 #-------------------------------------------------
 # Variogram in terms of fx
 hgrid = seq(0.5,80,by = 1.5)
-p = 3
-#sqr_exp_kernel(0,rep(10/p,p),1,c(70,20))
-sc0 = 300
-nug0 = 35
-lam0 = 400
-plot(geor_vghaty$u, geor_vghaty$v*2, ylim = c(0,1700), type = 'l', col='black')
-lines(geor_vghat2$u, geor_vghat1$v*2, col='red')
-Rxvec = sapply(hgrid,function(x) sqr_exp_kernel(0,rep(x/sqrt(p)),sqrt(sc0),c(lam0,lam0,lam0)))
-points(hgrid, 2*(sc0-Rxvec + nug0))
+p = 2
 
 # x bounds
 xbnds = t(apply(ms$x_test,2,range))
-xbnds = xbnds[-3,]
-#h_grid = seq(0.1,80,by = 0.1)
+xbnds = xbnds[1:2,]
 xgrid = cbind(runif(10000,xbnds[1,1],xbnds[1,2]),
-              runif(10000,xbnds[2,1],xbnds[2,2]),
-              runif(10000,xbnds[3,1],xbnds[3,2])
+              runif(10000,xbnds[2,1],xbnds[2,2])
 )
 
 # Grid Search
 fmeans = apply(ms$f_train,2,mean)
 # North Hemi
-#scale_list = c(150,150,150,150)
-#nug_list = c(70,70,65,75)
-#lc_list = c(450,450,480,480)
+#scale_list = c(265,265,265,265)
+#nug_list = c(70,65,60,75)
+#lc_list = c(1000,1000,1000,1000)
 
 # South Hemi
 #scale_list = c(300,300,300,300)
@@ -284,23 +202,23 @@ fmeans = apply(ms$f_train,2,mean)
 #lc_list = c(600,600)
 
 # World
-scale_list = c(240,230,225,240,240,265,265,265)
-nug_list = c(60,50,60,70,60,65,60,40)
-lc_list = c(500,500,700,620,600,700,700,700)
+scale_list = c(265,265,265,265,265,220,265,220)
+nug_list = c(60,50,65,70,55,62,60,38)
+lc_list = c(800,670,1000,750,720,500,700,550)
 
 Rxvec_list = list()
 for(j in 1:K){
-  Rxvec_list[[j]] = sapply(hgrid,function(x) sqr_exp_kernel(0,rep(x/sqrt(p)),sqrt(scale_list[j]),rep(lc_list[j],p)))
+  Rxvec_list[[j]] = sapply(hgrid,function(x) sqr_exp_kernel(0,rep(x/sqrt(p),p),sqrt(scale_list[j]),rep(lc_list[j],p)))
 }
 
-param_list = list(k = c(1.5,1.7,1.8), a1 = c(2), a2 = c(40),power = c(0.5))
+param_list = list(k = c(1.5,1.7,1.9,2.0), a1 = c(2,5), a2 = c(20,30,40),power = c(0.5,1,2))
 param_grid = expand.grid(param_list)
 vg_out = matrix(0,nrow = nrow(param_grid), ncol = length(hgrid))
 vg_matrix = matrix(0,nrow = K, ncol = length(hgrid))
 for(j in 1:nrow(param_grid)){
   for(i in 1:ncol(ms$f_train)){
-    vg = variogram.openbtmixing(xbnds[1:3,],hgrid,10000,1,
-                                k=param_grid[j,"k"],
+    vg = variogram.openbtmixing(xbnds,hgrid,10000,1,
+                                k = param_grid[j,"k"],
                                 0.95,
                                 power = param_grid[j,"power"],
                                 a1 = param_grid[j,"a1"],
@@ -308,7 +226,7 @@ for(j in 1:nrow(param_grid)){
                                 4,
                                 ncut = 1000,
                                 beta = 1/K,
-                                sigma2 = 0.55,
+                                sigma2 = 0.6,
                                 maxd = 5,
                                 xgrid = xgrid,
                                 rgrid = Rxvec_list[[i]],
@@ -322,19 +240,26 @@ for(j in 1:nrow(param_grid)){
   vg_out[j,] = apply(vg_matrix,2,sum)
 }
 
-plot(hgrid, apply(vg_matrix,2,sum), type = 'l', ylim = c(100,1000))
-lines(geor_vghaty$u, geor_vghaty$v*2,col='blue')
+plot(hgrid, apply(vg_matrix,2,sum)/2, type = 'l', ylim = c(50,500))
+points(geor_vghaty$u, geor_vghaty$v,col='blue')
+abline(h = var(ms$y_train))
 
-plot(hgrid,vg_out[1,], type = "l", ylim = c(100,1000))
+plot(hgrid,vg_out[19,], type = "l", ylim = c(100,1000))
 lines(geor_vghaty$u, geor_vghaty$v*2,col='blue')
 
 # Save results
-out = list(vg = vg_out, xbnds = xbnds, h = hgrid, pgrid = param_grid,sigma2 = 0.55,
+out = list(vg = vg_out, xbnds = xbnds, h = hgrid, pgrid = param_grid,sigma2 = vg$params$sigma2,
            fmean = fmeans, Rxvec_list = Rxvec_list,
            scale2_list = scale_list, len_scale_list = lc_list,
-           nug_list = nug_list, sigma2 =1, kernels = "sqr_exponential",
+           nug_list = nug_list, kernels = "sqr_exponential",
            dataref = paste0(filedir,datadir,dataname))
-saveRDS(out, paste0(filedir,"Variograms/vgy_world_2_n45000.rds"))
+saveRDS(out, paste0(filedir,"Variograms/vgy_world_lon_lat_n45000.rds"))
+
+
+var_env = variog.mc.env(coords = xdata, data = ms$y_train[h], obj.var = geor_vghaty)
+plot(geor_vghaty, envelope = var_env)
+
+vgram.ml = likfit(coords = xdata, data = ms$y_train[h], ini.cov.pars = c(2.5,1))
 
 
 #-------------------------------------------------

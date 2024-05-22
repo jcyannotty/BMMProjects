@@ -17,14 +17,14 @@ dirname = "/home/johnyannotty/NOAA_DATA/CMIP6_Interpolations/"
 era5dir = "/home/johnyannotty/NOAA_DATA/ERA5/era5_avg_mon_tas/"
 era5evdir = "/home/johnyannotty/NOAA_DATA/ERA5_Elevations/"
 era5elevname = "bilinear_copernicus_altitude.nc"
-sim_list = c("bilinear_tas_Amon_ACCESS-CM2_historical_r1i1p1f1_gn_2014.nc",
-             "bilinear_tas_Amon_BCC-CSM2-MR_historical_r1i1p1f1_gn_2014.nc",
-             "bilinear_tas_Amon_MIROC-ES2L_historical_r1i1p1f2_gn_2014.nc",
-             "bilinear_tas_Amon_CMCC-CM2-SR5_historical_r1i1p1f1_gn_2014.nc",
+sim_list = c(#"bilinear_tas_Amon_ACCESS-CM2_historical_r1i1p1f1_gn_2014.nc",
+             #"bilinear_tas_Amon_BCC-CSM2-MR_historical_r1i1p1f1_gn_2014.nc",
+             #"bilinear_tas_Amon_MIROC-ES2L_historical_r1i1p1f2_gn_2014.nc",
+             #"bilinear_tas_Amon_CMCC-CM2-SR5_historical_r1i1p1f1_gn_2014.nc",
              "bilinear_tas_Amon_CESM2_historical_r1i1p1f1_gn_2014.nc",
-             "bilinear_tas_Amon_CNRM-CM6-1-HR_historical_r1i1p1f2_gr_2014.nc",
-             "bilinear_tas_Amon_CanESM5_historical_r7i1p2f1_gn_2014.nc",
-             "bilinear_tas_Amon_KIOST-ESM_historical_r1i1p1f1_gr1_2014.nc"
+             "bilinear_tas_Amon_CNRM-CM6-1-HR_historical_r1i1p1f2_gr_2014.nc"
+             #"bilinear_tas_Amon_CanESM5_historical_r7i1p2f1_gn_2014.nc",
+             #"bilinear_tas_Amon_KIOST-ESM_historical_r1i1p1f1_gr1_2014.nc"
              )
 K = length(sim_list)
 
@@ -36,18 +36,20 @@ era5_lon_merc = ifelse(era5_lon>180,era5_lon-360,era5_lon)
 era5_time_hrs = ncvar_get(era5,"time")
 
 # Data sizes
-max_design = FALSE
+max_design = TRUE
 test_grid = TRUE
 test_equal_train = FALSE
 stepsz = 2 # used for test set
 
 # Locatation and time selection
-min_lon = -180; max_lon = 180
-min_lat = -90; max_lat = 90
+min_lon = -179.75; max_lon = -50
+min_lat = 25; max_lat = 75
 #mon_list = c("01","02","03","04","05","06","07","08","09","10","11","12")
-mon_list = c("04","08","12")
-yr_list = c("14")
-n_train = rep(15000,length(yr_list)*length(mon_list))
+#mon_list = c("02","04","06","08","10","12")
+#mon_list = c("04","08","12")
+mon_list = c("06")
+yr_list = paste(14)
+n_train = rep(300,length(yr_list)*length(mon_list))
 
 # Additional regions (lon_min, lon_max, lat_min, lat_max)
 add_data = FALSE
@@ -99,8 +101,8 @@ for(i in 1:length(n_train)){
     #xlist[[2]] = sort(unique(xgrid[h,"lat"]))
     xlist[[1]] = sort(unique(xgrid[x_test_ind,"lon"]))
     xlist[[2]] = sort(unique(xgrid[x_test_ind,"lat"]))
-    x1diff = mean(diff(xlist[[1]]))
-    x2diff = mean(diff(xlist[[1]]))
+    x1diff = 0.5 #mean(diff(xlist[[1]]))
+    x2diff = mean(diff(xlist[[2]]))
     
     #alist = c(min_lon, min_lat)
     #blist = c(max_lon, max_lat)
@@ -116,10 +118,10 @@ for(i in 1:length(n_train)){
     x_train_ind_temp[,2] = round((lon_lat_train[,2]-1)*x2diff + min(xlist[[2]]),2)
     
     if(nrow(unique(x_train_ind_temp)) < nrow(x_train_ind_temp)){stop("Uniqueness Error")}
-    if(min(x_train_ind_temp[,1]) < min(xlist[[1]])){stop("Min Error - Lon")}
-    if(max(x_train_ind_temp[,1]) > max(xlist[[1]])){stop("Max Error - Lon")}
-    if(min(x_train_ind_temp[,2]) < min(xlist[[2]])){stop("Min Error - Lat")}
-    if(max(x_train_ind_temp[,2]) > max(xlist[[2]])){stop("Max Error - Lat")}
+    if(min(x_train_ind_temp[,1]) < min_lon){stop("Min Error - Lon")}
+    if(max(x_train_ind_temp[,1]) > max_lon){stop("Max Error - Lon")}
+    if(min(x_train_ind_temp[,2]) < min_lat){stop("Min Error - Lat")}
+    if(max(x_train_ind_temp[,2]) > max_lat){stop("Max Error - Lat")}
     
     # Get the train indicies to be mapped to simulator output
     df1 = data.frame(xgrid)
@@ -224,7 +226,7 @@ head(x_test)
 tail(x_test)
 
 # Add Elevations
-add_elev = TRUE
+add_elev = FALSE
 if(add_elev){
   era5_elev = nc_open(paste0(era5evdir,era5elevname))
   ev = ncvar_get(era5_elev,"elev")
@@ -298,8 +300,8 @@ sn = gsub("CMCC-CM2-SR5","CMCC",sn)
 sn = gsub("CNRM-CM6-1-HR","CNRM",sn)
 sn = gsub("KIOST-ESM","KIOST",sn)
 
-desc = "W_3M_2014"
-ffold = "World/"
+desc = "NWH_June_14"
+ffold = "North_Hemisphere/"
 xx = system(paste0("ls ",filedir,ffold),intern = TRUE)
 #fname = paste0(sn,"_",desc,"_",dt,".rds")
 fname = paste0(sn,"_",desc,"_",dt,"_n",sum(n_train),".rds")
@@ -312,18 +314,17 @@ if(fname %in% xx){
 }
 
 
+
 #------------------------------------------------
 # Write csv's - used for python
 #------------------------------------------------
 #csvfold = paste0(sn,"_",desc,"_",dt,"_n",sum(n_train),"_csvs")
-csvfold = "ACC_BCC_MIROC_CMCC_CESM2_CNRM_CanESM5_KIOST_W_3M_2014_01_26_24_n45000_csvs/"
+#csvfold = "ACC_BCC_MIROC_CMCC_CESM2_CNRM_CanESM5_KIOST_W_3M_2014_01_26_24_n45000_csvs/"
+csvfold = "ACC_BCC_CESM2_CNRM_NH_6M14_n30000_csvs/"
 write.csv(out_data$f_train, paste0(filedir,ffold,csvfold,"f_train.csv"), row.names = FALSE)
 write.csv(out_data$y_train, paste0(filedir,ffold,csvfold,"y_train.csv"), row.names = FALSE)
 write.csv(out_data$x_train, paste0(filedir,ffold,csvfold,"x_train.csv"), row.names = FALSE)
 write.csv(out_data$f_test, paste0(filedir,ffold,csvfold,"f_test.csv"), row.names = FALSE)
 write.csv(out_data$y_test, paste0(filedir,ffold,csvfold,"y_test.csv"), row.names = FALSE)
 write.csv(out_data$x_test, paste0(filedir,ffold,csvfold,"x_test.csv"), row.names = FALSE)
-
-
-
 

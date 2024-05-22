@@ -223,8 +223,8 @@ saveRDS(vg_out, paste0(filedir,"vg/vg_results4_n200.rds"))
 #================================================
 # Now generate data from 1000 tree kernel 
 #================================================
-filedir = '/home/johnyannotty/Documents/Dissertation/results/rpath_bart/variogram_gen_1d/cov/'
-kern_data = readRDS(paste0(filedir,"rpc_list4_02_21_24.rds"))
+filedir = '/home/johnyannotty/Documents/Dissertation/results/rpath_bart/variogram_exs_1d/cov/'
+kern_data = readRDS(paste0(filedir,"rpc_list3_02_21_24.rds"))
 m = length(kern_data$tree_list)
 n = nrow(kern_data$rpc_list[[1]])
 
@@ -298,7 +298,7 @@ for(i in 1:nrow(param_grid)){
 }
 
 # Semi-variogram
-plot(h_grid,vg_means[73,], type = "l", ylim = c(0,1))
+plot(h_grid,vg_means[1,], type = "l", ylim = c(0,1))
 points(vgyhat$u,vgyhat$v)
 abline(h = var(y_train), col = "grey")
 
@@ -310,16 +310,23 @@ nu = 20
 q0 = 4
 
 # Train a bart model
-fit=train.openbtmixing(x_train,y_train,as.matrix(rep(1,n_train)),pbd=c(1.0,0),ntree = 75,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="physics_model",
+fit=train.openbtmixing(x_train,y_train,as.matrix(rep(1,n_train)),pbd=c(1.0,0),ntree =50,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="physics_model",
                        ndpost = 10000, nskip = 2000, nadapt = 5000, adaptevery = 500, printevery = 500,
                        power = 1.25, base = 0.95, minnumbot = 1, overallsd = sqrt(0.001), k = 1.1, overallnu = nu,
-                       summarystats = FALSE, rpath = TRUE, q = q0, rshp1 = 2, rshp2 = 50,
+                       summarystats = FALSE, rpath = TRUE, q = q0, rshp1 = 2, rshp2 = 10,
                        stepwpert = 0.1, probchv = 0.1, batchsize = 10000)
 
 
 #Get mixed mean function
 fitp=predict.openbtmixing(fit,x.test = x_test, f.test = as.matrix(rep(1,n_test)),tc=4, q.lower = 0.025, q.upper = 0.975,
                           ptype = "mean_and_sigma")
+
+
+g = gammapost.openbtmixing(fit)
+hist(g[,3])
+plot(g[,1], type = 'l')
+apply(g,2,mean)
+
 
 # Sigma
 hist(fitp$sdraws[,1])
@@ -331,6 +338,11 @@ sqrt(mean((fitp$mmean - f0_test)^2))
 plot_mean1d(x_test, pmean = fitp$mmean, plb = fitp$m.lower, pub = fitp$m.upper,
             amean = c(f0_test), colors = c("black","purple2"),
             apts_x = x_train, apts_y = y_train)
+
+plot_mean1d(x_test, pmean = fitp$mmean, plb = fitp$m.lower, pub = fitp$m.upper,
+            colors = c("black","purple2"),
+            apts_x = x_train, apts_y = y_train)
+
 
 #------------------------------------------------
 # Save Results
@@ -370,9 +382,9 @@ vg_out = list(y_train = y_train, x_train = x_train, h = h_grid, vge = vgyhat$v,
               vg_means = vg_means, vg_params = param_grid)
 
 # Save results
-filedir = "/home/johnyannotty/Documents/Dissertation/results/rpath_bart/variogram_gen/"
-saveRDS(fit_data,paste0(filedir,"pred/rpath_rpc3c.rds"))
-saveRDS(fitp$sdraws[,1], paste0(filedir,"pred/rpath_rpc3c_sdraws.rds"))
+filedir = "/home/johnyannotty/Documents/Dissertation/results/rpath_bart/variogram_exs_1d/"
+saveRDS(fit_data,paste0(filedir,"pred/rpath_rpc3d_03_30.rds"))
+saveRDS(fitp$sdraws[,1], paste0(filedir,"pred/rpath_rpc3d_sdraws_03_30.rds"))
 saveRDS(vg_out, paste0(filedir,"vg/vg_rpc3_n200.rds"))
 
 

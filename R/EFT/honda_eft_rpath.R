@@ -38,7 +38,7 @@ q0 = 4
 fit=train.openbtmixing(x_train,y_train,f_train,pbd=c(1.0,0),ntree = 10,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="physics_model",
                        ndpost = 10000, nskip = 2000, nadapt = 5000, adaptevery = 500, printevery = 500,
                        power = 2.0, base = 0.95, minnumbot = 3, overallsd = sqrt(sig2_hat), k = 3, overallnu = nu,
-                       summarystats = FALSE, rpath = TRUE, q = q0, rshp1 = 2, rshp2 = 40,
+                       summarystats = FALSE, rpath = TRUE, q = q0, rshp1 = 2, rshp2 = 10,
                        stepwpert = 0.1, probchv = 0.1, batchsize = 1000)
 
 

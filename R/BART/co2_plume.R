@@ -9,6 +9,8 @@ source("/home/johnyannotty/Documents/BayesToolBox/bayestb/GaussianProcesses/kern
 source("/home/johnyannotty/Documents/BayesToolBox/bayestb/Plotting/computer_expt_plots.R")
 source("/home/johnyannotty/Documents/BayesToolBox/bayestb/GaussianProcesses/gp_utils.R")
 
+library(geoR)
+
 #------------------------------------------------
 filedir = "/home/johnyannotty/Documents/Dissertation/data_sets/"
 load(paste0(filedir,"co2plume.dat_.gz"))
@@ -24,6 +26,199 @@ y_test = co2holdout$co2
 
 n_train = length(y_train)
 n_test = length(y_test)
+
+
+#-------------------------------------------------
+# Batch Fit
+#-------------------------------------------------
+# Train a bart model
+q0 = 4
+k = 2; a1 = 2; a2 = 2; pwr = 1.0
+nu = 20
+fit=train.openbtmixing(x_train,y_train,as.matrix(rep(1,n_train)),pbd=c(1.0,0),ntree = 50,ntreeh=1,
+                       numcut=300,tc=4,model="mixbart",modelname="co2_plume",
+                       ndpost = 10000, nskip = 2000, nadapt = 5000, adaptevery = 500, printevery = 500,
+                       power = pwr, base = 0.95, minnumbot = 2, overallsd = sqrt(0.05), k = k, overallnu = nu,
+                       summarystats = FALSE, rpath = TRUE, q = q0, rshp1 = a1, rshp2 = a2,
+                       stepwpert = 0.1, probchv = 0.1, batchsize = 10000, maxd = 12)
+
+#Get mixed mean function
+fitp=predict.openbtmixing(fit,x.test = x_test, f.test = as.matrix(rep(1,n_test)),tc=4, q.lower = 0.025, q.upper = 0.975,
+                          ptype = "mean_and_sigma", proj_type = "softmax", temperature = 0.2)
+
+
+# Sigma
+hist(unlist(fitp$sdraws[,1]))
+plot(unlist(fitp$sdraws[,1]))
+
+# Gamma
+#gp = gammapost.openbtmixing(fit)
+#hist(gp[,4])
+
+# on Testing data
+#rdf = data.frame(x_test,y_test - fitp$mmean-mean(y_train))
+rdf = data.frame(x_test,y_test - fitp$mmean)
+rownames(rdf) = NULL
+colnames(rdf)[3] = 'r'
+
+rdf %>% ggplot() + geom_point(aes(x = st, y = tm, color = r), size = 3) + 
+  scale_color_gradientn(limits = c(-10,10), colors = c("navy","grey95","darkred")) + 
+  theme_bw() + theme(axis.line = element_line(color = "grey70"),
+                     panel.border = element_blank(),plot.title = element_text(hjust = 0.5),
+                     legend.position = "right", legend.text = element_text(size = 10)) 
+
+#sqrt(mean((fitp$mmean + mean(y_train) - y_test)^2))
+sqrt(mean((fitp$mmean - y_test)^2))
+
+# Trace plots of selected predictions/fits
+hist(unlist(fitp$mdraws[,1]))
+plot(unlist(fitp$mdraws[,188]), type = 'l')
+
+# Coverage
+mean((y_test > fitp$m.lower) & (y_test < fitp$m.upper))
+#mean(((y_test - mean(y_train)) > fitp$m.lower) & ((y_test - mean(y_train)) < fitp$m.upper))
+
+
+# Save results
+fit_data = list(
+  pred_mean = fitp$mmean,
+  pred_ub = fitp$m.upper,
+  pred_lb = fitp$m.lower,
+  m = fit$m,
+  k = fit$k,
+  shp1 = fit$rshp1,
+  shp2 = fit$rshp2,
+  minnodesz = fit$minnumbot,
+  q = q0,
+  base = fit$base,
+  power = fit$power,
+  maxd = fit$maxd,
+  nu = fit$overallnu,
+  lam = fit$overalllambda
+)
+
+# Save results
+filedir = "/home/johnyannotty/Documents/Dissertation/results/rpath_bart/"
+saveRDS(fit_data,paste0(filedir,"co2_res2_03_22_24.rds"))
+saveRDS(fitp$sdraws[,1], paste0(filedir,"co2_sdraws2_03_22_24.rds"))
+
+
+#------------------------------------------------
+# On training data
+#------------------------------------------------
+fitp=predict.openbtmixing(fit,x.test = x_train, f.test = as.matrix(rep(1,n_train)),tc=4, q.lower = 0.025, q.upper = 0.975,
+                          ptype = "mean_and_sigma", proj_type = "softmax", temperature = 0.2)
+
+sqrt(mean((fitp$mmean + mean(y_train) - y_train)^2))
+
+df = data.frame(x_train,fitp$mmean+mean(y_train))
+rownames(df) = NULL
+colnames(df)[3] = 'fit'
+
+df %>% ggplot() + geom_point(aes(x = st, y = tm, color = fit),size = 3) + 
+  scale_color_viridis(option = "viridis", limits = c(0,220)) + 
+  theme_bw() + theme(axis.line = element_line(color = "grey70"),
+                     panel.border = element_blank(),plot.title = element_text(hjust = 0.5),
+                     legend.position = "right", legend.text = element_text(size = 10)) 
+
+co2plume %>% ggplot() + geom_point(aes(x = stack_inerts, y = time, color = co2),size = 3) + 
+  scale_color_viridis(option = "viridis", limits = c(0,220)) + 
+  theme_bw() + theme(axis.line = element_line(color = "grey70"),
+                     panel.border = element_blank(),plot.title = element_text(hjust = 0.5),
+                     legend.position = "right", legend.text = element_text(size = 10)) 
+
+rdf = data.frame(x_train,y_train - fitp$mmean-mean(y_train))
+rownames(rdf) = NULL
+colnames(rdf)[3] = 'r'
+
+rdf %>% ggplot() + geom_point(aes(x = st, y = tm, color = r), size = 3) + 
+  scale_color_viridis(option = "turbo", limits = c(-15,15)) + 
+  theme_bw() + theme(axis.line = element_line(color = "grey70"),
+                     panel.border = element_blank(),plot.title = element_text(hjust = 0.5),
+                     legend.position = "right", legend.text = element_text(size = 10)) 
+
+
+#------------------------------------------------
+# VG Batch Fit
+#------------------------------------------------
+# Empirical Variogram
+n_train = length(y_train)
+hgrid = seq(0.02,1.5, by = 0.05)
+vgyhat = variog(coords = x_train, data = y_train ,uvec = hgrid)
+plot(vgyhat$u,vgyhat$v)
+abline(h = var(y_train))
+
+# x bounds and h grid
+xbnds = t(apply(x_train,2,range))
+#param_list = list(k = c(1.0,1.5,2.0,3.0), a1 = c(2,5,10), a2 = c(10,20,40,60),power = c(0.5,1,2))
+param_list = list(k = c(1.5), a1 = c(5), a2 = c(50),power = c(0.5))
+param_grid = expand.grid(param_list)
+ncut = 200
+vg_out = matrix(0,nrow = nrow(param_grid), ncol = length(hgrid))
+sig2 = 0.01
+for(j in 1:nrow(param_grid)){
+  vg = variogram.openbtmixing(xbnds,hgrid,10000,1,
+                              k=param_grid[j,"k"],
+                              0.95,
+                              power = param_grid[j,"power"],
+                              a1 = param_grid[j,"a1"],
+                              a2 = param_grid[j,"a2"],
+                              4,
+                              ncut = ncut,
+                              beta = 0,
+                              sigma2 = sig2,
+                              maxd = 10,
+                              type = "b",
+                              ymin = min(y_train),
+                              ymax = max(y_train)
+  )
+  cat("Progress: ", round(j/nrow(param_grid),4)*100)
+  vg_out[j,] = vg$vmean
+}
+
+# Semi-variogram
+plot(hgrid,vg_out[1,]/2, type = "l", ylim = c(0,3000))
+points(vgyhat$u,vgyhat$v)
+abline(h = var(y_train), col = "grey")
+#points(hgrid,sapply(h-grid,function(h) (1-power_exp_kernel(0,h,1,0.3,1))), pch = 3, col = 'red')
+
+out = list(vg = vg_out, xbnds = xbnds, h = hgrid, pgrid = param_grid,
+           sigma2 = sig2,vgyhat = 2*vgyhat$v, vgyhat_uvec = vgyhat$u)
+saveRDS(out, paste0(filedir,"Variograms/vgb_co2_02_08_24.rds"))
+
+
+#------------------------------------------------
+# GP Fit
+#------------------------------------------------
+library(BayesGPfit)
+gp1 = GP.Bayes.fit(y_train, matrix(x_train, ncol = 2), progress_bar = TRUE, 
+                   poly_degree = 20, a = 0.001, b = 1) 
+gp1_pred = GP.predict(gp1,x_test)
+rdf = data.frame(x_test,y_test - gp1_pred$mean$f)
+rownames(rdf) = NULL
+colnames(rdf)[3] = 'r'
+
+sqrt(mean((y_test - gp1_pred$mean$f)^2))
+
+rdf %>% ggplot() + geom_point(aes(x = st, y = tm, color = r), size = 3) + 
+  scale_color_gradientn(limits = c(-10,10), colors = c("navy","grey95","darkred")) + 
+  theme_bw() + theme(axis.line = element_line(color = "grey70"),
+                     panel.border = element_blank(),plot.title = element_text(hjust = 0.5),
+                     legend.position = "right", legend.text = element_text(size = 10)) 
+
+
+
+
+gp1 = GP.Bayes.fit(c(0,1,25,8,9,4), matrix(rnorm(12), ncol = 2), progress_bar = TRUE, 
+                   poly_degree = 2) 
+
+set.seed(1227)
+dat = list()
+dat$x = GP.generate.grids(d=2,num_grids = 100)
+curve = GP.simulate.curve.fast(dat$x,a=0.01,b=0.5,poly_degree=20L)
+dat$f = curve$f + rnorm(length(curve$f),sd=1)
+fast_fit = GP.fast.Bayes.fit(dat$f,dat$x,a=0.01,b=0.5,poly_degree=10L,progress_bar = TRUE)
+
 
 #------------------------------------------------
 # VG Optimized
@@ -104,13 +299,13 @@ for(j in 1:4){res[j] = (exp(pvec[j])/(exp(pvec[j]) + 1))*(ubnds[j] - lbnds[j]) +
 #res[4] = (exp(pvec[4])/(exp(pvec[4]) + 1))*(ubnds[4] - lbnds[4]) + lbnds[4]
 
 
-sig2 = nu*res[4]/(nu+2)
+sig2 = 1.0
 vg = variogram.openbtmixing(xbnds,hgrid,10000,1,
                             k=2.0,#res[1],
                             0.95,
-                            power = 1,#pwr,
-                            a1 = 2,#res[2],
-                            a2 = 60,#res[3],
+                            power = 1.5,#pwr,
+                            a1 = 10,#res[2],
+                            a2 = 100,#res[3],
                             4,
                             ncut = ncut,
                             beta = 0,
@@ -128,156 +323,3 @@ abline(h = var(y_train))
 #res1 = res # hgrid = seq(0.02,0.4, by = 0.02)
 #res2 = res # hgrid = seq(0.02,0.2, by = 0.02)
 
-#-------------------------------------------------
-# Batch Fit
-#-------------------------------------------------
-# Train a bart model
-q0 = 4
-res[1] = 3.0; res[2] = 2; res[3] = 60; pwr = 1
-nu = 1
-fit=train.openbtmixing(x_train,y_train-mean(y_train),as.matrix(rep(1,n_train)),pbd=c(1.0,0),ntree = 75,ntreeh=1,
-                       numcut=300,tc=4,model="mixbart",modelname="co2_plume",
-                       ndpost = 10000, nskip = 2000, nadapt = 5000, adaptevery = 500, printevery = 500,
-                       power = pwr, base = 0.95, minnumbot = 2, overallsd = sqrt(sig2), k = res[1], overallnu = nu,
-                       summarystats = FALSE, rpath = TRUE, q = q0, rshp1 = res[2], rshp2 = res[3],
-                       stepwpert = 0.1, probchv = 0.1, batchsize = 5000, maxd = 10)
-
-#Get mixed mean function
-fitp=predict.openbtmixing(fit,x.test = x_test, f.test = as.matrix(rep(1,n_test)),tc=4, q.lower = 0.025, q.upper = 0.975,
-                          ptype = "mean_and_sigma", proj_type = "softmax", temperature = 0.2)
-
-
-# Sigma
-hist(unlist(fitp$sdraws[,1]))
-plot(unlist(fitp$sdraws[,1]))
-
-# Gamma
-#gp = gammapost.openbtmixing(fit)
-#hist(gp[,4])
-
-# on Testing data
-rdf = data.frame(x_test,y_test - fitp$mmean-mean(y_train))
-rownames(rdf) = NULL
-colnames(rdf)[3] = 'r'
-
-rdf %>% ggplot() + geom_point(aes(x = st, y = tm, color = r), size = 3) + 
-  scale_color_gradientn(limits = c(-10,10), colors = c("navy","grey95","darkred")) + 
-  theme_bw() + theme(axis.line = element_line(color = "grey70"),
-                     panel.border = element_blank(),plot.title = element_text(hjust = 0.5),
-                     legend.position = "right", legend.text = element_text(size = 10)) 
-
-sqrt(mean((fitp$mmean + mean(y_train) - y_test)^2))
-
-# Trace plots of selected predictions/fits
-hist(unlist(fitp$mdraws[,1]))
-plot(unlist(fitp$mdraws[,188]), type = 'l')
-
-# Coverage
-mean(((y_test - mean(y_train)) > fitp$m.lower) & ((y_test - mean(y_train)) < fitp$m.upper))
-
-
-# Save results
-fit_data = list(
-  pred_mean = fitp$mmean + mean(y_train),
-  pred_ub = fitp$m.upper + mean(y_train),
-  pred_lb = fitp$m.lower + mean(y_train),
-  m = fit$m,
-  k = fit$k,
-  shp1 = fit$rshp1,
-  shp2 = fit$rshp2,
-  minnodesz = fit$minnumbot,
-  q = q0,
-  base = fit$base,
-  power = fit$power,
-  maxd = fit$maxd,
-  nu = fit$overallnu,
-  lam = fit$overalllambda
-)
-
-# Save results
-filedir = "/home/johnyannotty/Documents/RandomPathBART/BART_Results/"
-saveRDS(fit_data,paste0(filedir,"co2_res5_02_07_24.rds"))
-saveRDS(fitp$sdraws[,1], paste0(filedir,"co2_sdraws5_02_07_24.rds"))
-
-
-#------------------------------------------------
-# On training data
-#------------------------------------------------
-fitp=predict.openbtmixing(fit,x.test = x_train, f.test = as.matrix(rep(1,n_train)),tc=4, q.lower = 0.025, q.upper = 0.975,
-                          ptype = "mean_and_sigma", proj_type = "softmax", temperature = 0.2)
-
-sqrt(mean((fitp$mmean + mean(y_train) - y_train)^2))
-
-df = data.frame(x_train,fitp$mmean+mean(y_train))
-rownames(df) = NULL
-colnames(df)[3] = 'fit'
-
-df %>% ggplot() + geom_point(aes(x = st, y = tm, color = fit),size = 3) + 
-  scale_color_viridis(option = "viridis", limits = c(0,220)) + 
-  theme_bw() + theme(axis.line = element_line(color = "grey70"),
-                     panel.border = element_blank(),plot.title = element_text(hjust = 0.5),
-                     legend.position = "right", legend.text = element_text(size = 10)) 
-
-co2plume %>% ggplot() + geom_point(aes(x = stack_inerts, y = time, color = co2),size = 3) + 
-  scale_color_viridis(option = "viridis", limits = c(0,220)) + 
-  theme_bw() + theme(axis.line = element_line(color = "grey70"),
-                     panel.border = element_blank(),plot.title = element_text(hjust = 0.5),
-                     legend.position = "right", legend.text = element_text(size = 10)) 
-
-rdf = data.frame(x_train,y_train - fitp$mmean-mean(y_train))
-rownames(rdf) = NULL
-colnames(rdf)[3] = 'r'
-
-rdf %>% ggplot() + geom_point(aes(x = st, y = tm, color = r), size = 3) + 
-  scale_color_viridis(option = "turbo", limits = c(-15,15)) + 
-  theme_bw() + theme(axis.line = element_line(color = "grey70"),
-                     panel.border = element_blank(),plot.title = element_text(hjust = 0.5),
-                     legend.position = "right", legend.text = element_text(size = 10)) 
-
-
-#------------------------------------------------
-# VG Batch Fit
-#------------------------------------------------
-# Empirical Variogram
-n_train = length(y_train)
-hgrid = seq(0.02,1, by = 0.025)
-vgyhat = variog(coords = x_train, data = y_train ,uvec = hgrid)
-plot(vgyhat$u,vgyhat$v)
-abline(h = var(y_train))
-
-# x bounds and h grid
-xbnds = t(apply(x_train,2,range))
-param_list = list(k = c(1.0,1.5,2.0,3.0), a1 = c(2,5,10), a2 = c(10,20,40,60),power = c(0.5,1,2))
-param_grid = expand.grid(param_list)
-ncut = 200
-vg_out = matrix(0,nrow = nrow(param_grid), ncol = length(hgrid))
-sig2 = 0.25
-for(j in 1:nrow(param_grid)){
-  vg = variogram.openbtmixing(xbnds,hgrid,10000,1,
-                              k=param_grid[j,"k"],
-                              0.95,
-                              power = param_grid[j,"power"],
-                              a1 = param_grid[j,"a1"],
-                              a2 = param_grid[j,"a2"],
-                              4,
-                              ncut = ncut,
-                              beta = 0,
-                              sigma2 = sig2,
-                              maxd = 10,
-                              type = "b",
-                              ymin = min(y_train),
-                              ymax = max(y_train)
-  )
-  cat("Progress: ", round(j/nrow(param_grid),4)*100)
-  vg_out[j,] = vg$vmean
-}
-
-# Semi-variogram
-plot(hgrid,vg_out[112,]/2, type = "l", ylim = c(0,700))
-points(vgyhat$u,vgyhat$v)
-abline(h = var(y_train), col = "grey")
-#points(hgrid,sapply(h-grid,function(h) (1-power_exp_kernel(0,h,1,0.3,1))), pch = 3, col = 'red')
-
-out = list(vg = vg_out, xbnds = xbnds, h = hgrid, pgrid = param_grid,
-           sigma2 = sig2,vgyhat = 2*vgyhat$v, vgyhat_uvec = vgyhat$u)
-saveRDS(out, paste0(filedir,"Variograms/vgb_co2_02_08_24.rds"))

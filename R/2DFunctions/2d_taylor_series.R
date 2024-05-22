@@ -73,29 +73,33 @@ f_test = cbind(h1_test, h2_test)
 #-----------------------------------------------------
 # Model Training 
 #-----------------------------------------------------
-nu = 20
+nu = 40
 rho = 1
 sig2_hat = max(apply(apply(f_train, 2, function(x) (x-y_train)^2),2,min))
 lam = rho*sig2_hat*(nu+2)/nu
 q0 = 4
-fit=openbt(x_train,y_train,f_train,pbd=c(1.0,0),ntree = 15,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="physics_model",
-           ndpost = 10000, nskip = 2000, nadapt = 5000, adaptevery = 500, printevery = 500,
-           power = 2.0, base = 0.95, minnumbot = 3, overallsd = sqrt(sig2_hat), k = 3, overallnu = nu,
-           summarystats = FALSE, selectp = FALSE, rpath = TRUE, q = 4.0, rshp1 = 15, rshp2 = 15,
+fit=openbt(x_train,y_train,f_train,pbd=c(1.0,0),ntree = 10,ntreeh=1,numcut=300,tc=2,model="mixbart",modelname="physics_model",
+           ndpost = 10000, nskip = 2000, nadapt = 4000, adaptevery = 500, printevery = 500,
+           power = 1.0, base = 0.95, minnumbot = 3, overallsd = sqrt(sig2_hat), k = 1.2, overallnu = nu,
+           summarystats = FALSE, selectp = FALSE, rpath = TRUE, q = 4.0, rshp1 = 2, rshp2 = 10,
            stepwpert = 0.1, probchv = 0.1)
 
 
 #Get mixed mean function
 fitp=predict.openbt(fit,x.test = x_test, f.test = f_test,tc=4, q.lower = 0.025, q.upper = 0.975)
-p1 = plot_pred_2d_gg2(x_test,matrix(fitp$mmean),scale_vals = c(-2.7,-0.25,2.05), title = "Mean Prediction from BMM")
+p1 = plot_pred_2d_gg2(x_test,matrix(fitp$mmean),scale_vals = c(-2.7,-0.25,2.05), 
+                      title = "Mean Prediction from BMM", viridis_opt = "turbo")
 
 #Get the model weights
 K = 2
 fitw = mixingwts.openbt(fit, x.test = x_test, numwts = K, tc = 4)
 w1 = plot_wts_2d_gg2(x_test,fitw$wmean,wnum = 1,xcols = c(1,2), title="Mean Weights", scale_colors = c("black","red2","yellow"),
-                     scale_vals = c(-0.1,0.5,1.1))
+                     scale_vals = c(-0.1,0.5,1.08))
 w2 = plot_wts_2d_gg2(x_test,fitw$wmean,wnum = 2,xcols = c(1,2), title="Mean Weights", scale_colors = c("black","red2","yellow"),
-                     scale_vals = c(-0.1,0.5,1.1))
+                     scale_vals = c(-0.1,0.5,1.08))
+
+hist(unlist(fitp$sdraws[,1]))
+plot(unlist(fitp$sdraws[,1]))
 
 # Get wsum
 wsum = 0*fitw$wdraws[[1]]
@@ -139,7 +143,6 @@ fit_data = list(
   wsum_mean = wsum_mean,
   wsum_lb = wsum_lb,
   wsum_ub = wsum_ub,
-  wdiff = wdiff,
   x_train = x_train,
   y_train = y_train,
   m = fit$m,
@@ -154,7 +157,8 @@ fit_data = list(
   lam = fit$overalllambda
 )
 
-saveRDS(fit_data, paste0(filedir,"taylor_sincos2_results3_10_30_23.rds"))
+filedir = "/home/johnyannotty/Documents/Dissertation/results/2d_functions/"
+saveRDS(fit_data, paste0(filedir,"sincos2_res_rpath1_03_18_24.rds"))
 
 ms = list(
   y_train = y_train,
@@ -168,6 +172,59 @@ ms = list(
 
 filedir = '/home/johnyannotty/Documents/Dissertation/results/2d_functions/'
 saveRDS(ms, paste0(filedir,"ms_taylor_sincos.rds"))
+
+#-----------------------------------------------------
+# Slice Prediction
+#-----------------------------------------------------
+# Slices
+K = 2
+x_slice = cbind(rep(-2,200),seq(-pi,pi,length = 200))
+fitw_slice = mixingwts.openbt(fit, x.test = x_slice, numwts = K, tc = 4)
+
+wdraws1 = as.matrix(fitw_slice$wdraws[[1]])
+wdraws2 = as.matrix(fitw_slice$wdraws[[2]])
+wdraws_itr = cbind(wdraws1[500,],wdraws2[500,])
+
+colnames(wdraws1) = NULL; colnames(wdraws2) = NULL
+plot(x_slice[,2],wdraws_itr[,1], type = "l", col = 'red')
+lines(x_slice[,2],wdraws_itr[,2], type = "l", col = 'blue')
+
+# Slice plots
+lty_list$wts_lty = rep("solid",3)
+#slice_title = bquote("Posterior Weight Functions at"~"x"[1]~"= 2,"~" x"[2]*"\\in"*"(-\pi,\pi)")
+#slice_title = TeX("Posterior Weight Functions at $x_1 = 2$, and $x_2 \\in (-\\pi,\\pi)$")
+slice_title = "Posterior Mean and 95% Pointwise Credible Intervals"
+wslice = plot_wts_gg2(fitw_slice, x_slice[,2], y_lim = c(-0.1, 1.25), title = slice_title, gray_scale = FALSE)
+wslice = wslice+theme(axis.text=element_text(size=12),axis.title=element_text(size=15), plot.title = element_text(size = 16))
+wslice = wslice+labs(x=bquote("X"[2]))
+
+#slice_draw_title = TeX("Posterior Sample of Weights at $x_1 = 2$, and $x_2 \\in (-\\pi,\\pi)$")
+slice_draw_title = "One Posterior Sample"
+wslice_draw = list(wmean = wdraws_itr, w.upper = wdraws_itr, w.lower = wdraws_itr)
+wslice_pw = plot_wts_gg2(wslice_draw, x_slice[,2], y_lim = c(-0.1, 1.25), title = slice_draw_title, 
+                         gray_scale = FALSE)
+wslice_pw = wslice_pw+theme(axis.text=element_text(size=12),axis.title=element_text(size=15), plot.title = element_text(size = 16))
+wslice_pw = wslice_pw+labs(x=bquote("X"[2]))
+
+top_title = TeX("Posterior Weight Functions at $x_1 = 2$, and $x_2 \\in (-\\pi,\\pi)$")
+grid.arrange(arrangeGrob(wslice+theme(legend.position = "bottom", legend.key.size = unit(1.0,'cm')),
+                         wslice_pw+theme(legend.position = "bottom", legend.key.size = unit(1.0,'cm')),
+                         nrow = 1), nrow=1, heights = c(10), 
+             top = textGrob("Posterior Weight Functions",gp = gpar(fontsize = 20)))
+
+
+fit_slice = list(
+  wts_mean = fitw_slice$wmean,
+  wts_ub = fitw_slice$w.upper,
+  wts_lb = fitw_slice$w.lower,
+  wt1_draw  = wdraws1[1,],
+  wt2_draw  = wdraws2[1,],
+  x_slice = x_slice
+)
+
+saveRDS(fit_slice, paste0(filedir,"/sincos_slice_rpath_03_18_24.rds"))
+
+
 
 #-----------------------------------------------------
 # Precision Weights Empirical Variogram
@@ -343,3 +400,30 @@ for(i in 1:K){
 wsum_mean = apply(wsum,2,mean)
 wsum_lb = apply(wsum,2,quantile, 0.025)
 wsum_ub = apply(wsum,2,quantile, 0.975)
+
+
+
+
+fit=train.openbtmixing(x_train,y_train,f_train,pbd=c(1.0,0),ntree = 10,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="physics_model",
+                       ndpost = 10000, nskip = 2000, nadapt = 5000, adaptevery = 500, printevery = 500,
+                       power = 1.0, base = 0.95, minnumbot = 3, overallsd = sqrt(sig2_hat), k = 1.2, overallnu = nu,
+                       summarystats = FALSE, rpath = TRUE, q = q0, rshp1 = 2, rshp2 = 10,
+                       stepwpert = 0.1, probchv = 0.1, batchsize = 10000)
+
+#openbt.save(fit,fname = "/home/johnyannotty/Documents/temp_res.obt")
+
+
+#Get mixed mean function
+fitp=predict.openbtmixing(fit,x.test = x_test, f.test = f_test,tc=4, q.lower = 0.025, q.upper = 0.975,
+                          ptype = "mean", proj_type = "euclidean", temperature = 0.8)
+
+#Get mixed mean function
+p1 = plot_pred_2d_gg2(x_test,matrix(fitp$mmean),scale_vals = c(-2.7,-0.25,2.05), 
+                      title = "Mean Prediction from BMM", viridis_opt = "turbo")
+
+#Get the model weights
+K = 2
+w1 = plot_wts_2d_gg2(x_test,fitp$wmean,wnum = 1,xcols = c(1,2), title="Mean Weights", scale_colors = c("black","red2","yellow"),
+                     scale_vals = c(-0.1,0.5,1.08))
+w2 = plot_wts_2d_gg2(x_test,fitp$wmean,wnum = 2,xcols = c(1,2), title="Mean Weights", scale_colors = c("black","red2","yellow"),
+                     scale_vals = c(-0.1,0.5,1.08))
