@@ -272,6 +272,7 @@ vgyhat = variog(coords = cbind(x_train,rep(0,n_train)), data = y_train ,uvec = u
 
 plot(vgyhat$u,vgyhat$v)
 
+xmin = -1; xmax = 1
 xbnds = matrix(c(xmin,xmax), nrow = 1, byrow = FALSE)
 
 param_grid = expand.grid(k = c(1,1.1,1.2), a1 = c(2,5,10), a2 = c(10,25,30), pwr = c(1,1.25,1.5,2))
@@ -298,7 +299,7 @@ for(i in 1:nrow(param_grid)){
 }
 
 # Semi-variogram
-plot(h_grid,vg_means[1,], type = "l", ylim = c(0,1))
+plot(h_grid,vg_means[12,], type = "l", ylim = c(0,1))
 points(vgyhat$u,vgyhat$v)
 abline(h = var(y_train), col = "grey")
 
@@ -313,7 +314,7 @@ q0 = 4
 fit=train.openbtmixing(x_train,y_train,as.matrix(rep(1,n_train)),pbd=c(1.0,0),ntree =50,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="physics_model",
                        ndpost = 10000, nskip = 2000, nadapt = 5000, adaptevery = 500, printevery = 500,
                        power = 1.25, base = 0.95, minnumbot = 1, overallsd = sqrt(0.001), k = 1.1, overallnu = nu,
-                       summarystats = FALSE, rpath = TRUE, q = q0, rshp1 = 2, rshp2 = 10,
+                       summarystats = FALSE, rpath = TRUE, q = q0, rshp1 = 2, rshp2 = 30,
                        stepwpert = 0.1, probchv = 0.1, batchsize = 10000)
 
 

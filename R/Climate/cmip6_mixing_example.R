@@ -199,7 +199,7 @@ pdagger = plot_mean2d_map_viridis(xs_test[,1:2],out_data$y_test,xcols = c(1,2),
                                   lat_bnds = out_data$lat_bnds,
                                   lon_bnds = out_data$lon_bnds
 ) 
-pdagger = pdagger + labs(fill = wk_lab, x = "Longitude", y = "Latitude") + theme(axis.title = element_text(size=18))
+pdagger = pdagger + labs(fill = "", x = "Longitude", y = "Latitude") + theme(axis.title = element_text(size=18))
 pdagger = pdagger + theme(axis.text=element_text(size=12),axis.title=element_text(size=16), plot.title = element_text(size = 15),legend.title = element_text(size = 16))
 pdagger = pdagger + theme(axis.title = element_blank(), axis.ticks = element_blank(),
                           axis.text = element_blank())
@@ -207,7 +207,7 @@ pdagger = pdagger + theme(axis.title = element_blank(), axis.ticks = element_bla
 
 pb = plot_mean2d_map_viridis(xs_test[,1:2],fit1$pred_mean,xcols = c(1,2), 
                              viridis_opt = "viridis",
-                             scale_limit = c(scmin,scmax), title = "BART-BMM",
+                             scale_limit = c(scmin,scmax), title = "RPBART-BMM",
                              maps_list = list(data.frame(world),data.frame(states)),
                              maps_cols = c("grey30","grey30"),
                              lat_bnds = out_data$lat_bnds,
@@ -221,7 +221,7 @@ pb + theme(plot.margin=unit(c(-0.5,1,1,1),"cm"))
 
 p1 = plot_mean2d_map_viridis(xs_test[,1:2],out_data$f_test[,1],xcols = c(1,2), 
                                   viridis_opt = "viridis",
-                                  scale_limit = c(scmin,scmax), title = "BART-BMM",
+                                  scale_limit = c(scmin,scmax), title = "RPBART-BMM",
                                   maps_list = list(data.frame(world),data.frame(states)),
                                   maps_cols = c("grey30","grey30"),
                                   lat_bnds = out_data$lat_bnds,
@@ -231,7 +231,7 @@ p1 = plot_mean2d_map_viridis(xs_test[,1:2],out_data$f_test[,1],xcols = c(1,2),
 
 p2 = plot_mean2d_map_viridis(xs_test[,1:2],out_data$f_test[,2],xcols = c(1,2), 
                              viridis_opt = "viridis",
-                             scale_limit = c(scmin,scmax), title = "BART-BMM",
+                             scale_limit = c(scmin,scmax), title = "RPBART-BMM",
                              maps_list = list(data.frame(world),data.frame(states)),
                              maps_cols = c("grey30","grey30"),
                              lat_bnds = out_data$lat_bnds,
