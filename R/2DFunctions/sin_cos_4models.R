@@ -97,6 +97,7 @@ pdagger = pdagger + theme(axis.text=element_text(size=12),axis.title=element_tex
 # Function path
 fp_list = list()
 K = ncol(f_test)
+wk_lab = bquote(hat(w)[k]*"(x)")
 for(i in 1:K){
   fk_lab = bquote(f[.(i)]*"(x)")
   p1 = plot_mean2d_viridis(x_test,matrix(f_test[,i]), 
