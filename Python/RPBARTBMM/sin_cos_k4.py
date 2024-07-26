@@ -76,16 +76,16 @@ w3 = wmean.transpose()[1]
 w4 = wmean.transpose()[1]
 
 w1_mean = wmean.transpose()[0]
-w1_mean = w1_mean.reshape((25,25)).transpose()
+w1_mean = w1_mean.reshape((25,25))
 
 w2_mean = wmean.transpose()[1]
-w2_mean = w2_mean.reshape((25,25)).transpose()
+w2_mean = w2_mean.reshape((25,25))
 
 w3_mean = wmean.transpose()[2]
-w3_mean = w3_mean.reshape((25,25)).transpose()
+w3_mean = w3_mean.reshape((25,25))
 
 w4_mean = wmean.transpose()[3]
-w4_mean = w4_mean.reshape((25,25)).transpose()
+w4_mean = w4_mean.reshape((25,25))
 
 
 # Posterior Mean resiudals
@@ -140,3 +140,38 @@ ax[3].yaxis.set_major_formatter(ticker.FixedFormatter(np.round(np.linspace(-np.p
 ax[3].tick_params(labelsize = 13)
 fig.colorbar(pcm3,ax = ax[3],location="bottom")
 plt.show()
+
+
+# Predictions
+pmean = fitp["pred"]["mean"]
+cmap = plt.get_cmap('turbo')
+fig, ax = plt.subplots(1,2, figsize = (12,5))
+
+pcm1 = ax[0].pcolormesh(f0_test.reshape(25,25),cmap = cmap, vmin = -2.0, vmax = 2.0,shading='gouraud')
+ax[0].set_title("True System", size = 16)
+ax[0].set(xlabel = "$x_1$", ylabel = "$x_2$")
+ax[0].xaxis.set_major_locator(ticker.FixedLocator(np.round(np.linspace(0, n_test, 6),3)))
+ax[0].xaxis.set_major_formatter(ticker.FixedFormatter(np.round(np.linspace(-np.pi, np.pi, 6),3)))
+ax[0].yaxis.set_major_locator(ticker.FixedLocator(np.round(np.linspace(0, n_test, 6),3)))
+ax[0].yaxis.set_major_formatter(ticker.FixedFormatter(np.round(np.linspace(-np.pi, np.pi, 6),3)))
+fig.colorbar(pcm1,ax = ax[0])
+
+
+# Predicted mean
+pcm2 = ax[1].pcolormesh(pmean.reshape(25,25),cmap = cmap, vmin = -2.0, vmax = 2.0,shading='gouraud')
+ax[1].set_title("Posterior Mean Prediction", size = 16)
+ax[1].set(xlabel = "$x_1$", ylabel = "$x_2$")
+ax[1].xaxis.set_major_locator(ticker.FixedLocator(np.round(np.linspace(0, n_test, 6),3)))
+ax[1].xaxis.set_major_formatter(ticker.FixedFormatter(np.round(np.linspace(-np.pi, np.pi, 6),3)))
+ax[1].yaxis.set_major_locator(ticker.FixedLocator(np.round(np.linspace(0, n_test, 6),3)))
+ax[1].yaxis.set_major_formatter(ticker.FixedFormatter(np.round(np.linspace(-np.pi, np.pi, 6),3)))
+
+fig.colorbar(pcm2,ax = ax[1])
+fig.suptitle("Figure 8: True versus Predicted System", size = 18)
+plt.show()
+
+
+mix.post_gamma()
+plt.hist(mix.gdraws[:,1])
+plt.show()
+

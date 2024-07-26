@@ -129,7 +129,9 @@ fig.suptitle("Figure 8: True versus Predicted System", size = 18)
 plt.show()
 
 
-
+rpb.post_gamma()
+plt.hist(rpb.gdraws[:,14])
+plt.show()
 
 #pd.DataFrame(x_train).to_csv("/home/johnyannotty/Downloads/tempx", header = False, index = False)
 #pd.DataFrame(y_train).to_csv("/home/johnyannotty/Downloads/tempy", header = False, index = False)
