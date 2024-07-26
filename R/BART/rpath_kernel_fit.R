@@ -9,7 +9,8 @@ source("/home/johnyannotty/Documents/BayesToolBox/bayestb/GaussianProcesses/kern
 source("/home/johnyannotty/Documents/BayesToolBox/bayestb/GaussianProcesses/gp_utils.R")
 source("/home/johnyannotty/Documents/openbt/src/openbt_mixing.R")
 
-setwd("/home/johnyannotty/Documents/openbt/src")
+setwd("/home/johnyannotty/Documents/openbt/temp/openbt-current-rpath")
+setwd("/home/johnyannotty/Documents/")
 
 library(geoR)
 
@@ -26,6 +27,7 @@ kappa = 1
 tau2 = ((ymax - ymin)/(2*kappa))^2
 x_train = seq(xmin+0.05,xmax-0.05,length = n_train) 
 x_test = seq(xmin+0.01,xmax-0.01,length = n_test) 
+x_all = c(x_train, x_test)
 
 alpha = 0.95
 beta = 2.0
@@ -82,7 +84,7 @@ rpc = matrix(rpc, nrow = n_all, ncol = n_all, byrow = FALSE)
 diag(rpc) = tau2 
 
 plot_phix(x_test, phix_all[(n_train+1):(n_train+n_test),])
-plot_kernel_viridis(rpc[(n_train+1):n_all,(n_train+1):n_all])
+plot_kernel_viridis(rpc[(n_train+1):n_all,(n_train+1):n_all]/tau2)
 
 
 #------------------------------------------------
@@ -161,8 +163,8 @@ fit=train.openbtmixing(x_train,y_train,as.matrix(rep(1,n_train)),pbd=c(1.0,0),nt
 
 
 #Get mixed mean function
-fitp=predict.openbtmixing(fit,x.test = x_test, f.test = as.matrix(rep(1,n_test)),tc=4, q.lower = 0.025, q.upper = 0.975,
-                          ptype = "mean_and_sigma")
+fitp=predict.openbtmixing(fit,x.test = x_test, f.test = as.matrix(rep(1,n_test)), q.lower = 0.025, q.upper = 0.975,
+                          ptype = "mean_and_sigma", tc=4)
 
 # Sigma
 hist(fitp$sdraws[,1])
@@ -232,7 +234,6 @@ n_train = 200
 n_test = 200
 
 rpc = kern_data$rpc_list[[length(kern_data$rpc_list)]]
-
 train_ind = 2*(0:(n_train-1)) + 1
 test_ind = 2*(1:n_train)
 x_train = kern_data$x[train_ind]
@@ -311,7 +312,7 @@ nu = 20
 q0 = 4
 
 # Train a bart model
-fit=train.openbtmixing(x_train,y_train,as.matrix(rep(1,n_train)),pbd=c(1.0,0),ntree =50,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="physics_model",
+fit=train.openbtmixing(x_train,y_train,as.matrix(rep(1,n_train)),pbd=c(1.0,0),ntree =20,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="physics_model",
                        ndpost = 10000, nskip = 2000, nadapt = 5000, adaptevery = 500, printevery = 500,
                        power = 1.25, base = 0.95, minnumbot = 1, overallsd = sqrt(0.001), k = 1.1, overallnu = nu,
                        summarystats = FALSE, rpath = TRUE, q = q0, rshp1 = 2, rshp2 = 30,
@@ -324,7 +325,7 @@ fitp=predict.openbtmixing(fit,x.test = x_test, f.test = as.matrix(rep(1,n_test))
 
 
 g = gammapost.openbtmixing(fit)
-hist(g[,3])
+hist(g[,1])
 plot(g[,1], type = 'l')
 apply(g,2,mean)
 

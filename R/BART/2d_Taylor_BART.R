@@ -18,7 +18,7 @@ filedir = '/home/johnyannotty/Documents/RandomPathBART/VariogramResults/2d_funct
 
 #-----------------------------------------------------
 #-----------------------------------------------------
-set.seed(2)
+set.seed(23)
 n_train = 100 
 n_test = 25
 xoff = 0.10
@@ -58,7 +58,7 @@ lam = rho*sig2_hat*(nu+2)/nu
 q0 = 4
 
 
-fit=train.openbtmixing(x_train,y_train,as.matrix(rep(1,n_train)),pbd=c(1.0,0),ntree = 20,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="physics_model",
+fit=train.openbtmixing(x_train,y_train,as.matrix(rep(1,n_train)),pbd=c(1.0,0),ntree = 20,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="mixmodel",
                        ndpost = 5000, nskip = 2000, nadapt = 5000, adaptevery = 500, printevery = 500,
                        power = 1.0, base = 0.95, minnumbot = 3, overallsd = sqrt(sig2_hat), k = 1.0, overallnu = nu,
                        summarystats = FALSE, rpath = TRUE, q = q0, rshp1 = 2, rshp2 = 20,
@@ -158,3 +158,7 @@ grid.arrange(arrangeGrob(pd + theme(legend.position = "none",axis.text = element
                            labs(x = TeX("$x_1"),y = TeX("$x_2")), 
                          ncol  = 2), 
              nrow = 2, pleg, heights = c(10,1))
+
+
+y_train = as.vector(read.csv("/home/johnyannotty/Downloads/tempy.txt", header = FALSE))$V1
+x_train = as.matrix(read.csv("/home/johnyannotty/Downloads/tempx.txt", header = FALSE))

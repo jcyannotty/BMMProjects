@@ -160,7 +160,7 @@ rho = 1
 sig2_hat = max(apply(apply(f_train, 2, function(x) (x-y_train)^2),2,min))
 lam = rho*sig2_hat*(nu+2)/nu
 q0 = 4
-fit=openbt(x_train,y_train,f_train,pbd=c(1.0,0),ntree = 10,ntreeh=1,numcut=300,tc=2,model="mixbart",modelname="physics_model",
+fit=openbt(x_train,y_train,f_train,pbd=c(1.0,0),ntree = 10,ntreeh=1,numcut=300,tc=4,model="mixbart",modelname="mixmodel",
            ndpost = 10000, nskip = 2000, nadapt = 4000, adaptevery = 500, printevery = 500,
            power = 1.0, base = 0.95, minnumbot = 3, overallsd = sqrt(sig2_hat), k = 1.0, overallnu = nu,
            summarystats = FALSE, selectp = FALSE, rpath = TRUE, q = 4.0, rshp1 = 2, rshp2 = 10,
@@ -235,6 +235,7 @@ grid.arrange(arrangeGrob(wp_list[[1]],wp_list[[2]],wp_list[[3]],wp_list[[4]],
 
 hist(unlist(fitp$sdraws[,1]))
 plot(unlist(fitp$sdraws[,1]))
+mean(unlist(fitp$sdraws[,1]))
 
 # Get wsum
 wsum = 0*fitw$wdraws[[1]]
@@ -293,3 +294,12 @@ ms = list(
 
 filedir = '/home/johnyannotty/Documents/Dissertation/results/2d_functions/'
 saveRDS(ms, paste0(filedir,"ms_sincos_n100.rds"))
+
+
+
+write.csv(ms$f_train, paste0(filedir,"sincos_4k_ftrain_rpath_05_07_24.txt"), row.names = FALSE)
+write.csv(ms$f_test, paste0(filedir,"sincos_4k_ftest_rpath_05_07_24.txt"), row.names = FALSE)
+write.csv(ms$f0_test, paste0(filedir,"sincos_4k_f0test_rpath_05_07_24.txt"), row.names = FALSE)
+write.csv(ms$x_train, paste0(filedir,"sincos_4k_xtrain_rpath_05_07_24.txt"), row.names = FALSE)
+write.csv(ms$x_test, paste0(filedir,"sincos_4k_xtest_rpath_05_07_24.txt"), row.names = FALSE)
+write.csv(ms$y_train, paste0(filedir,"sincos_4k_ytrain_rpath_05_07_24.txt"), row.names = FALSE)
