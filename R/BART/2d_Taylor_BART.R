@@ -5,8 +5,9 @@ source("/home/johnyannotty/Documents/openbt/src/openbt.R")
 source("/home/johnyannotty/Documents/openbt/src/openbt_mixing.R")
 source("/home/johnyannotty/Documents/openbt/R/polynomials.R")
 source("/home/johnyannotty/Documents/openbt/R/mixing_priors.R")
-source("/home/johnyannotty/Documents/openbt/R/eft_mixing_helper_functions.R")
-source("/home/johnyannotty/Documents/BayesToolBox/bayestb/Samplers/sampler_functions.R")
+#source("/home/johnyannotty/Documents/openbt/R/eft_mixing_helper_functions.R")
+source("C:/Users/johny/Documents/packages/OpenBT/R/eft_mixing_helper_functions.R")
+source("C:/Users/johny/Documents/packages/BayesToolBox/bayestb/Samplers/sampler_functions.R")
 
 library(plotly)
 library(viridis)
@@ -113,7 +114,8 @@ saveRDS(fitp$sdraws[,1], paste0(filedir,"2d_taylor_bart_sdraws4_04_11_24.rds"))
 #-----------------------------------------------------
 # Plots
 #-----------------------------------------------------
-filedir = "/home/johnyannotty/Documents/Dissertation/results/rpath_bart/2dtaylor/"
+#filedir = "/home/johnyannotty/Documents/Dissertation/results/rpath_bart/2dtaylor/"
+filedir = "D:/Dissertation/results/rpath_bart/2dtaylor/"
 rp1 = readRDS(paste0(filedir,"2d_taylor_res1_04_11_24.rds"))
 rp2 = readRDS(paste0(filedir,"2d_taylor_res2_04_11_24.rds"))
 rp4 = readRDS(paste0(filedir,"2d_taylor_res3_04_11_24.rds"))
@@ -124,6 +126,14 @@ c(rp1$shp1,rp1$shp2)
 c(rp2$shp1,rp2$shp2)
 c(rp3$shp1,rp3$shp2)
 c(rp4$shp1,rp4$shp2)
+
+
+str(rp1)
+
+xt_min = apply(x_train,2,min);  xt_max = apply(x_train,2,max); 
+x1_test = round(seq(xt_min[1]-0.1,xt_max[1]+0.1,length = n_test),4)
+x2_test = round(seq(xt_min[1]-0.1,xt_max[1]+0.1,length = n_test),4)
+x_test = expand.grid(x1_test,x2_test)
 
 
 pd = plot_pred_2d_gg2(x_test,matrix(f0_test),scale_vals = c(-2,0,2), 

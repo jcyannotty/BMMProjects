@@ -292,6 +292,8 @@ ms = list(
   s = s
 )
 
+
+#filedir = '/home/johnyannotty/Documents/Dissertation/results/2d_functions/'
 filedir = '/home/johnyannotty/Documents/Dissertation/results/2d_functions/'
 saveRDS(ms, paste0(filedir,"ms_sincos_n100.rds"))
 
@@ -303,3 +305,74 @@ write.csv(ms$f0_test, paste0(filedir,"sincos_4k_f0test_rpath_05_07_24.txt"), row
 write.csv(ms$x_train, paste0(filedir,"sincos_4k_xtrain_rpath_05_07_24.txt"), row.names = FALSE)
 write.csv(ms$x_test, paste0(filedir,"sincos_4k_xtest_rpath_05_07_24.txt"), row.names = FALSE)
 write.csv(ms$y_train, paste0(filedir,"sincos_4k_ytrain_rpath_05_07_24.txt"), row.names = FALSE)
+
+
+#-----------------------------------------------
+# Plots
+#-----------------------------------------------
+filedir = "D:/Dissertation/results/2d_functions/"
+fit_data = readRDS(paste0(filedir,"sincos_4k_res_rpath_05_07_24.rds"))
+ms = readRDS(paste0(filedir,"ms_sincos_n100.rds"))
+
+# Preds
+pb1 = plot_mean2d_viridis(ms$x_test,matrix(fit_data$pred_mean), 
+                         viridis_opt = "turbo",
+                         scale_limit = c(-2.2,2.2), title = "RPBART-BMM\n") 
+pb1 = pb1 + labs(fill = wk_lab, x = bquote(x[1]), y = element_blank()) + theme(axis.title = element_text(size=18))
+pb1 = pb1 + theme(axis.text=element_text(size=12),axis.title=element_text(size=18), plot.title = element_text(size = 15),legend.title = element_text(size = 16))
+
+rb1 = plot_mean2d_gradient(ms$x_test,matrix(ms$f0_test - fit_data$pred_mean), 
+                           scale_vals = c(-0.1,0,0.1), title = TeX("$\\hat{r}(x) = f_\\dagger(x) - \\hat{f}_\\dagger(x)$") ) 
+rb1 = rb1 + labs(fill = wk_lab, x = bquote(x[1]), y = element_blank()) + theme(axis.title = element_text(size=18))
+rb1 = rb1 + theme(axis.text=element_text(size=12),axis.title=element_text(size=18), plot.title = element_text(size = 15),legend.title = element_text(size = 16))
+
+
+pbw1 = plot_mean2d_viridis(ms$x_test,matrix(fit_data$pred_ub - fit_data$pred_lb), 
+                          viridis_opt = "inferno",
+                          scale_limit = c(0.05,0.45), title = "Credible Interval Width \n") 
+pbw1 = pbw1 + labs(fill = wk_lab, x = bquote(x[1]), y = element_blank()) + theme(axis.title = element_text(size=18))
+pbw1 = pbw1 + theme(axis.text=element_text(size=12),axis.title=element_text(size=18), plot.title = element_text(size = 15),legend.title = element_text(size = 16))
+
+
+grid.arrange(arrangeGrob(pb1 + theme(legend.position = "bottom", legend.key.width = unit(1.5,"cm"),
+                                     legend.text = element_text(size = 15)) + 
+                           labs(fill = TeX("$\\hat{f}_\\dagger(x)$  ")),
+                         rb1 + theme(legend.position = "bottom", legend.key.width = unit(1.5,"cm"),
+                                     legend.text = element_text(size = 15)) + 
+                           labs(fill = TeX("$\\hat{r}(x)$  ")),
+                         pbw1 + theme(legend.position = "bottom", legend.key.width = unit(1.5,"cm"),
+                                      legend.text = element_text(size = 15)) + 
+                           labs(fill = "Width"),nrow = 1,
+                         left = grid.text(bquote(x[2]), rot = 90, 
+                                                   gp = gpar(fontsize = 18))), 
+             nrow = 2, heights = c(1,0.05))
+
+
+# BART-BMM Wts
+# Wt1
+wp_list = list()
+K = 4
+wtpal = plasma(6)
+wtpal[6] = "yellow2"
+wtpal = c("black",wtpal)
+wsv = seq(-0.4,0.8,length = 7)
+wk_lab = bquote(hat(w)[k]*"(x)")
+
+for(i in 1:K){
+  wk_lab = bquote(hat(w)[.(i)]*"(x)")
+  w1b = plot_mean2d_map_gradient(ms$x_test,fit_data$wts_mean[,i],xcols = c(1,2), 
+                                 title=wk_lab, 
+                                 scale_colors = wtpal, scale_vals = wsv)
+  w1b = w1b + labs(fill = wk_lab, x = bquote(x[1]), y = element_blank()) + theme(axis.title = element_text(size=18))
+  w1b = w1b + theme(axis.text=element_text(size=12),axis.title=element_text(size=18), plot.title = element_text(size = 15),legend.title = element_text(size = 16))
+  
+  if(i == 1){wleg = g_legend(w1b + theme(legend.position = "bottom", 
+                                         legend.key.width = unit(2.2,"cm"))+ 
+                               labs(fill =  bquote(hat(w)[k]*"(x)")))}
+  wp_list[[i]] = w1b + theme(legend.position = "none")
+}
+
+grid.arrange(arrangeGrob(wp_list[[1]],wp_list[[2]],wp_list[[3]],wp_list[[4]],
+                         nrow = 1,left = grid.text(bquote(x[2]), rot = 90, 
+                                                   gp = gpar(fontsize = 18))), 
+             nrow = 2, wleg, heights = c(1,0.1))
